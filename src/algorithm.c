@@ -66,6 +66,61 @@ uint64_t run_best_response_iteration(game_system *game)
     return change_occurred;
 }
 
+int is_minimal(game_system *game)
+{
+    graph *g = game->g;
+    uint64_t n = game->num_players;
+
+    // array che indica se un vertice del cover ha almeno un "private edge"
+    unsigned char *has_private = (unsigned char*) calloc(n, sizeof(unsigned char));
+    if (!has_private) return 0; // fallimento allocazione -> consideriamo non minimale
+
+    // Scorriamo tutti i vicini per costruire l'informazione sui private edges.
+    // Per grafi non orientati memorizzati simmetricamente, processiamo solo u < v per
+    // non contare due volte lo stesso arco.
+    for (uint64_t u = 0; u < n; ++u)
+    {
+        uint64_t start = g->row_ptr[u];
+        uint64_t end   = g->row_ptr[u + 1];
+
+        for (uint64_t ei = start; ei < end; ++ei)
+        {
+            uint64_t v = g->col_ind[ei];
+
+            // evita di considerare lo stesso arco due volte (assumendo rappresentazione simmetrica)
+            if (u >= v) continue;
+
+            unsigned char in_u = game->strategies[u]; // 0 o 1
+            unsigned char in_v = game->strategies[v];
+
+            // Se esiste esattamente un endpoint nel cover, quell'endpoint ha un private edge
+            if (in_u && !in_v)
+            {
+                has_private[u] = 1;
+            }
+            else if (in_v && !in_u)
+            {
+                has_private[v] = 1;
+            }
+            // se entrambi in cover o entrambi fuori, questo arco non produce private edge
+        }
+    }
+
+    // Ora controlliamo che ogni vertice che è nel cover abbia almeno un private edge
+    int minimal = 1;
+    for (uint64_t i = 0; i < n; ++i)
+    {
+        if (game->strategies[i] == 1 && !has_private[i])
+        {
+            minimal = 0;
+            break;
+        }
+    }
+
+    free(has_private);
+    return minimal;
+}
+/*
 uint64_t is_solution_minimal(game_system *game)
 {
     // Try removing each node that's currently in the cover (strategy == 1)
@@ -114,3 +169,4 @@ uint64_t is_solution_minimal(game_system *game)
     
     return 1; // No node could be removed, so the cover is minimal
 }
+*/

@@ -2,6 +2,7 @@
 #include "include/algorithm.h"
 #include "include/data_structures.h"
 #include <time.h>
+#include <inttypes.h>
 
 // Define filename constant for easy changing
 #define GRAPH_FILENAME "graph_dump.bin"
@@ -13,7 +14,7 @@ int main(void)
 
     // 1. Try to load the graph from file first
     printf("Checking for existing graph file '%s'...\n", GRAPH_FILENAME);
-    g = load_graph_from_file(GRAPH_FILENAME);
+    g = NULL; // load_graph_from_file(GRAPH_FILENAME);
 
     if (g != NULL) 
     {
@@ -25,7 +26,7 @@ int main(void)
         printf("File not found. Generating new random regular graph...\n");
         
         // Generating 10 Million nodes as per your original code
-        g = generate_random_regular(10000000, 6);
+        g = generate_random_regular(1000000, 6);
 
         if (g == NULL) 
         {
@@ -51,13 +52,13 @@ int main(void)
     {
         // Reduced print verbosity for 1000 iterations
         //if (game.iteration % 10 == 0) 
-        printf("--- Iterazione %d ---\n", game.iteration + 1);
+        printf("--- Iterazione %lu ---\n", game.iteration + 1);
 
         uint64_t changed = run_best_response_iteration(&game);
         if (!changed)
         {
             converged = 1;
-            printf("Equilibrio di Nash raggiunto alla it %d\n", game.iteration);
+            printf("Equilibrio di Nash raggiunto alla it %lu\n", game.iteration);
         }
 
         if (game.iteration > MAX_IT) break;
@@ -68,16 +69,16 @@ int main(void)
     printf("Elapsed time: %.2f seconds\n", elapsed_time);
 
     // --- CHECK MINIMALITY ---
-    uint64_t minimal = is_solution_minimal(&game);
+    int minimal = is_minimal(&game);
     printf("Is solution minimal? %s\n", minimal ? "YES" : "NO");
 
     printf("Network Security Set:");
     long count = 0;
-    for (long i = 0; i < game.num_players; ++i)
+    for (uint64_t i = 0; i < game.num_players; ++i)
     {
        if (game.strategies[i] == 1) count++;
     }
-    printf("%ld\n", count);
+    printf("%lu\n", count);
 
     
     free_game(&game);

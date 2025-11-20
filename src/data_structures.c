@@ -190,8 +190,7 @@ graph* generate_random_regular(uint64_t num_nodes, uint64_t degree)
 }
 
 // Not implemented for CSR optimization task
-graph* load_graph_from_file(const char *filename) { return NULL; }
-graph* generate_erdos_renyi(uint64_t num_nodes, double p) { return NULL; }
+// (placeholders removed; full implementations are provided below)
 
 
 // +-----------------+
