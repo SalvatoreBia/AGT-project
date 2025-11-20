@@ -29,26 +29,21 @@ typedef struct
 
 typedef struct
 {
-    graph *g;            // Puntatore al grafo
-    player *players;     // Array dei giocatori
-    int num_players;     // Deve essere uguale a g->num_nodes
+    graph *g;
+    player *players;
+    int num_players;
     int iteration;
 } game_system;
 
-// --- FIRME DELLE FUNZIONI (SIGNATURES) ---
 
-// 1. Gestione Grafo
 graph* create_graph(int num_nodes);
 void add_edge(graph *g, int src, int dest);
 void free_graph(graph *g);
-void print_graph(graph *g); // Utile per debugging
+void print_graph(graph *g);
 
-// 2. Gestione Gioco
-// Modifica suggerita: passiamo il grafo 'g' invece di 'n'
 void init_game(game_system *game, graph *g); 
 void free_game(game_system *game);
 
-// 3. Caricamento Input (Opzionale ma consigliato)
 graph* load_graph_from_file(const char *filename);
 
 #endif /* DATA_STRUCTURES_H */
