@@ -1,5 +1,5 @@
 CC := gcc
-CFLAGS := -Wall -Wextra -Iinclude -g
+CFLAGS := -Wall -Wextra -Iinclude -g -O3
 
 SRC := main.c $(wildcard src/*.c)
 OBJ_DIR := build

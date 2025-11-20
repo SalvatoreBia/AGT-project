@@ -37,6 +37,7 @@ typedef struct
 
 graph* create_graph(int num_nodes);
 void add_edge(graph *g, int src, int dest);
+int has_edge(graph *g, int u, int v);
 void free_graph(graph *g);
 void print_graph(graph *g);
 
@@ -44,5 +45,8 @@ void init_game(game_system *game, graph *g);
 void free_game(game_system *game);
 
 graph* load_graph_from_file(const char *filename);
+graph* generate_erdos_renyi(int num_nodes, double p);
+graph* generate_random_regular(int num_nodes, int degree);
+
 
 #endif /* DATA_STRUCTURES_H */

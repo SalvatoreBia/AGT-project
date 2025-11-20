@@ -8,7 +8,12 @@ int main(void)
 {
     game_system game;
 
-    graph *g = load_graph_from_file("example_graph.txt");
+    // graph *g = load_graph_from_file("example_graph.txt");
+    // graph * g = generate_erdos_renyi(1000000, 0.01);
+    
+    graph *g = generate_random_regular(8000000, 4);
+
+    printf("Grafo generato\n");
     if (g == NULL) return 1;
 
     init_game(&game, g);
