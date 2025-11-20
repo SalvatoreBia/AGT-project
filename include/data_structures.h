@@ -1,7 +1,6 @@
 #ifndef DATA_STRUCTURES_H
 #define DATA_STRUCTURES_H
 
-// --- STRUTTURE DATI (Già definite da te) ---
 
 typedef struct adjacent_node
 {
@@ -12,7 +11,7 @@ typedef struct adjacent_node
 typedef struct
 {
     int num_nodes;
-    adj_node **nodes; // Array di liste di adiacenza
+    adj_node **nodes;
 } graph;
 
 typedef struct
