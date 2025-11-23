@@ -22,6 +22,9 @@ typedef struct
 {
     graph *g;
     unsigned char *strategies; // Hot array (0 or 1)
+
+    double *cumulative_regrets;
+
     uint64_t num_players;
     uint64_t iteration;
 } game_system;

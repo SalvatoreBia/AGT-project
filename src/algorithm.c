@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
 #include "../include/algorithm.h"
 
 
@@ -120,6 +121,97 @@ int is_minimal(game_system *game)
     free(has_private);
     return minimal;
 }
+
+
+///////////////////////////////////
+// REGRET MATCHING
+///////////////////////////////////
+
+static double get_random_double()
+{
+    return (double)rand() / (double)RAND_MAX;
+}
+
+void init_cumulative_regrets(game_system *game)
+{
+    game->cumulative_regrets = (double*)calloc(game->num_players * 2, sizeof(double));
+
+    for (uint64_t i = 0; i < game->num_players * 2; ++i)
+    {
+        game->cumulative_regrets[i] = 0.0;
+    }
+}
+
+void free_cumulative_regrets(game_system *game)
+{
+    if (game->cumulative_regrets != NULL)
+    {
+        free((void*)game->cumulative_regrets);
+    }
+}
+
+uint64_t run_regret_matching_iteration(game_system *game)
+{
+    uint64_t nnodes = game->num_players;
+
+    uint64_t active_nodes_count = 0;
+
+    for (uint64_t i = 0; i < nnodes; ++i)
+    {
+        double r0 = game->cumulative_regrets[2 * i    ];
+        double r1 = game->cumulative_regrets[2 * i + 1];
+
+        if (r0 < 0) r0 = 0.0;
+        if (r1 < 0) r1 = 0.0;
+
+        double sum = r0 + r1;
+        
+        double prob1 = (sum < 1e-9) ? 0.5 : r1 / sum;
+
+        if (get_random_double() < prob1)
+        {
+            game->strategies[i] = 1;
+            active_nodes_count++;
+        }
+        else
+        {
+            game->strategies[i] = 0;
+        }
+    }
+
+    for (uint64_t i = 0; i < nnodes; ++i)
+    {
+        uint64_t neighbors_off_count = 0;
+
+        for (uint64_t k = game->g->row_ptr[i]; k < game->g->row_ptr[i+1]; ++k)
+        {
+            uint64_t neighbor = game->g->col_ind[k];
+            if (game->strategies[neighbor] == 0)
+            {
+                neighbors_off_count++;
+            }
+        }
+
+        double util_if_0 = 0.0 - (PENALTY_UNSECURED * neighbors_off_count);
+        double util_if_1 = -COST_SECURITY;
+
+        double final_util = (game->strategies[i] == 1) ? util_if_1 : util_if_0;
+
+        double regret0 = util_if_0 - final_util;
+        double regret1 = util_if_1 - final_util;
+
+        if (regret0 < 0) regret0 = 0;
+        if (regret1 < 0) regret1 = 0;
+
+        game->cumulative_regrets[2 * i    ] += regret0;
+        game->cumulative_regrets[2 * i + 1] += regret1;
+    }
+
+    game->iteration++;
+    return active_nodes_count;
+}
+
+
 /*
 uint64_t is_solution_minimal(game_system *game)
 {
