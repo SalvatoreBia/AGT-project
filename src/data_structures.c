@@ -4,7 +4,6 @@
 #include <time.h>
 #include "../include/data_structures.h"
 
-// --- GESTIONE GRAFO ---
 
 graph *create_graph(uint64_t num_nodes, uint64_t num_edges)
 {
@@ -18,7 +17,6 @@ graph *create_graph(uint64_t num_nodes, uint64_t num_edges)
     g->num_nodes = num_nodes;
     g->num_edges = num_edges;
 
-    // Uso calloc per row_ptr per sicurezza (inizializza a 0)
     g->row_ptr = (uint64_t *)calloc((num_nodes + 1), sizeof(uint64_t));
     g->col_ind = (uint64_t *)malloc(num_edges * sizeof(uint64_t));
 
@@ -60,7 +58,6 @@ void print_graph(graph *g)
     }
 }
 
-// --- FILE I/O ---
 
 uint64_t save_graph_to_file(graph *g, const char *filename)
 {
@@ -91,7 +88,7 @@ graph *load_graph_from_file(const char *filename)
 
     FILE *f = fopen(filename, "rb");
     if (!f)
-        return NULL; // Silenzioso se non esiste, gestito dal main
+        return NULL;
 
     uint64_t num_nodes = 0, num_edges = 0;
 
@@ -122,9 +119,7 @@ graph *load_graph_from_file(const char *filename)
     return g;
 }
 
-// --- GENERATORI GRAFI ---
 
-// Helper: Shuffle array per randomizzazione archi
 static void shuffle_array(uint64_t *array, uint64_t n)
 {
     for (uint64_t i = n - 1; i > 0; i--)
@@ -136,7 +131,6 @@ static void shuffle_array(uint64_t *array, uint64_t n)
     }
 }
 
-// Helper: Verifica parziale durante la costruzione per evitare duplicati
 static uint64_t has_edge_partial(graph *g, uint64_t u, uint64_t v, uint64_t current_u_degree)
 {
     uint64_t start = g->row_ptr[u];
@@ -177,14 +171,11 @@ graph *generate_random_regular(uint64_t num_nodes, uint64_t degree)
         if (!g)
             break;
 
-        // Inizializza row_ptr per grafo regolare
         for (uint64_t i = 0; i <= num_nodes; ++i)
             g->row_ptr[i] = i * degree;
 
-        // Reset gradi correnti per il tentativo
         memset(current_degree, 0, num_nodes * sizeof(uint64_t));
 
-        // Riempi stubs: [0,0,0, 1,1,1, ...]
         uint64_t k = 0;
         for (uint64_t i = 0; i < num_nodes; ++i)
         {
@@ -219,7 +210,6 @@ graph *generate_random_regular(uint64_t num_nodes, uint64_t degree)
     return g;
 }
 
-// --- GESTIONE GIOCO ---
 
 void init_game(game_system *game, graph *g)
 {
@@ -228,11 +218,9 @@ void init_game(game_system *game, graph *g)
     game->strategies = (unsigned char *)malloc(game->num_players * sizeof(unsigned char));
     game->iteration = 0;
 
-    // Inizializza puntatori RS a NULL per sicurezza
     game->rs.regrets = NULL;
     game->rs.probs = NULL;
 
-    // Strategie iniziali random
     for (uint64_t i = 0; i < game->num_players; ++i)
     {
         game->strategies[i] = rand() % 2;

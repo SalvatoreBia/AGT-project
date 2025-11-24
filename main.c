@@ -23,7 +23,6 @@ int main(void)
     graph *g = NULL;
     srand((unsigned int)time(NULL));
 
-    // 1. CARICAMENTO / GENERAZIONE GRAFO
     printf("Checking for graph '%s'...\n", GRAPH_FILENAME);
 
     // decommenta per caricare il dump
@@ -36,7 +35,7 @@ int main(void)
     else
     {
         printf("Generating new random regular graph...\n");
-        g = generate_random_regular(1000, 6); // 1000 nodi, grado 6
+        g = generate_random_regular(4, 2);
         if (!g)
         {
             fprintf(stderr, "Error: Failed to generate graph.\n");
@@ -45,7 +44,6 @@ int main(void)
         save_graph_to_file(g, GRAPH_FILENAME);
     }
 
-    // 2. INIZIALIZZAZIONE GIOCO
     clock_t start_time = clock();
     init_game(&game, g);
 
@@ -59,7 +57,6 @@ int main(void)
     // init_fictitious_play(&game);
 #endif
 
-    // 3. MAIN LOOP
     uint64_t converged = 0;
 
     while (game.iteration < MAX_IT)
@@ -101,7 +98,6 @@ int main(void)
     printf("Valid Cover: %s\n", valid ? "YES" : "NO");
     printf("Minimal Local: %s\n", minimal ? "YES" : "NO");
 
-    // 5. CLEANUP
 #if CURRENT_ALGORITHM == ALGO_RM
     free_regret_system(&game);
 #endif

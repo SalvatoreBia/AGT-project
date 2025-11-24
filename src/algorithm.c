@@ -155,7 +155,7 @@ int is_valid_cover(game_system *game)
         {
             uint64_t v = g->col_ind[k];
             if (u > v)
-                continue; // check una volta sola per arco
+                continue;
 
             if (game->strategies[v] == 0)
             {
