@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <inttypes.h>
+#include <unistd.h>
 #include "include/algorithm.h"
 #include "include/data_structures.h"
 
@@ -9,23 +10,54 @@
 #define ALGO_RM 2
 #define ALGO_FP 3
 
-#define CURRENT_ALGORITHM ALGO_RM
-
 #define GRAPH_FILENAME "graph_dump.bin"
 
-#ifndef MAX_IT
-#define MAX_IT 1000
-#endif
+void print_usage(const char *prog_name) {
+    printf("Usage: %s [options]\n", prog_name);
+    printf("Options:\n");
+    printf("  -n <nodes>       Number of nodes (default: 10000)\n");
+    printf("  -k <edges>       Number of edges per node (default: 4)\n");
+    printf("  -i <iterations>  Maximum number of iterations (default: 1000)\n");
+    printf("  -a <algorithm>   Algorithm to use (1=BRD, 2=RM, 3=FP) (default: 3)\n");
+    printf("  -h               Show this help message\n");
+}
 
-#ifndef NUM_NODES
-#define NUM_NODES 10000
-#endif
-#ifndef NUM_EDGES_PER_NODE
-#define NUM_EDGES_PER_NODE 4
-#endif
-
-int main(void)
+int main(int argc, char *argv[])
 {
+    // Default values
+    uint64_t num_nodes = 10000;
+    uint64_t num_edges_per_node = 4;
+    uint64_t max_it = 1000;
+    int algorithm = ALGO_FP;
+
+    int opt;
+    while ((opt = getopt(argc, argv, "n:k:i:a:h")) != -1) {
+        switch (opt) {
+            case 'n':
+                num_nodes = strtoull(optarg, NULL, 10);
+                break;
+            case 'k':
+                num_edges_per_node = strtoull(optarg, NULL, 10);
+                break;
+            case 'i':
+                max_it = strtoull(optarg, NULL, 10);
+                break;
+            case 'a':
+                algorithm = atoi(optarg);
+                if (algorithm < ALGO_BRD || algorithm > ALGO_FP) {
+                    fprintf(stderr, "Invalid algorithm selection. Use 1, 2, or 3.\n");
+                    return 1;
+                }
+                break;
+            case 'h':
+                print_usage(argv[0]);
+                return 0;
+            default:
+                print_usage(argv[0]);
+                return 1;
+        }
+    }
+
     game_system game;
     graph *g = NULL;
     srand((unsigned int)time(NULL));
@@ -41,8 +73,8 @@ int main(void)
     }
     else
     {
-        printf("Generating new random regular graph...\n");
-        g = generate_random_regular(NUM_NODES, NUM_EDGES_PER_NODE);
+        printf("Generating new random regular graph with %" PRIu64 " nodes and degree %" PRIu64 "...\n", num_nodes, num_edges_per_node);
+        g = generate_random_regular(num_nodes, num_edges_per_node);
         if (!g)
         {
             fprintf(stderr, "Error: Failed to generate graph.\n");
@@ -54,42 +86,51 @@ int main(void)
     clock_t start_time = clock();
     init_game(&game, g);
 
-#if CURRENT_ALGORITHM == ALGO_BRD
-    printf("Algorithm: Best Response Dynamics (BRD)\n");
-#elif CURRENT_ALGORITHM == ALGO_RM
-    printf("Algorithm: Regret Matching (RM)\n");
-    init_regret_system(&game);
-#elif CURRENT_ALGORITHM == ALGO_FP
-    printf("Algorithm: Fictitious Play (FP)\n");
-    init_fictious_system(&game);
-#endif
+    if (algorithm == ALGO_BRD) {
+        printf("Algorithm: Best Response Dynamics (BRD)\n");
+    } else if (algorithm == ALGO_RM) {
+        printf("Algorithm: Regret Matching (RM)\n");
+        init_regret_system(&game);
+    } else if (algorithm == ALGO_FP) {
+        printf("Algorithm: Fictitious Play (FP)\n");
+        init_fictious_system(&game);
+    }
 
     uint64_t converged = 0;
 
-    while (game.iteration < MAX_IT)
+    while (game.iteration < max_it)
     {
         if (game.iteration % 100 == 0)
         {
-            printf("--- It %lu ---\n", game.iteration + 1);
+            printf("--- It %" PRIu64 " ---\n", game.iteration + 1);
         }
 
-#if CURRENT_ALGORITHM == ALGO_BRD
-        if (!run_best_response_iteration(&game))
-        {
+        int change = 0;
+        if (algorithm == ALGO_BRD) {
+            change = run_best_response_iteration(&game);
+        } else if (algorithm == ALGO_RM) {
+            change = run_regret_matching_iteration(&game);
+        } else if (algorithm == ALGO_FP) {
+            change = run_fictious_play_iteration(&game);
+        }
+        
+        if (!change) {
             converged = 1;
-            printf("Nash Equilibrium reached at it %lu\n", game.iteration);
+            printf("Convergence reached at it %" PRIu64 "\n", game.iteration);
             break;
         }
-#elif CURRENT_ALGORITHM == ALGO_RM
-        run_regret_matching_iteration(&game);
-#elif CURRENT_ALGORITHM == ALGO_FP
-        run_fictious_play_iteration(&game);
-#endif
+
         game.iteration++;
     }
 
     double elapsed = (double)(clock() - start_time) / CLOCKS_PER_SEC;
     printf("\nSimulation finished in %.2fs\n", elapsed);
+    
+    if (converged) {
+        printf("Converged: YES\n");
+    } else {
+        printf("Converged: NO\n");
+    }
 
     // 4. ANALISI RISULTATI
     int minimal = is_minimal(&game);
@@ -102,15 +143,15 @@ int main(void)
             active_count++;
     }
 
-    printf("Cover Size: %ld / %lu\n", active_count, game.num_players);
+    printf("Cover Size: %ld / %" PRIu64 "\n", active_count, game.num_players);
     printf("Valid Cover: %s\n", valid ? "YES" : "NO");
     printf("Minimal Local: %s\n", minimal ? "YES" : "NO");
 
-#if CURRENT_ALGORITHM == ALGO_RM
-    free_regret_system(&game);
-#elif CURRENT_ALGORITHM == ALGO_FP
-    free_fictious_system(&game);
-#endif
+    if (algorithm == ALGO_RM) {
+        free_regret_system(&game);
+    } else if (algorithm == ALGO_FP) {
+        free_fictious_system(&game);
+    }
 
     free_game(&game);
     free_graph(g);

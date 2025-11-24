@@ -87,15 +87,14 @@ void free_regret_system(game_system *game)
 uint64_t run_regret_matching_iteration(game_system *game)
 {
     uint64_t nnodes = game->num_players;
-    uint64_t active_nodes_count = 0;
-
+    
+    // 1. Update strategies based on probabilities from PREVIOUS iteration
     for (uint64_t i = 0; i < nnodes; ++i)
     {
         double prob_1 = game->rs.probs[2 * i + 1];
         if (get_random_double() < prob_1)
         {
             game->strategies[i] = 1;
-            active_nodes_count++;
         }
         else
         {
@@ -103,6 +102,9 @@ uint64_t run_regret_matching_iteration(game_system *game)
         }
     }
 
+    uint64_t is_nash = 1;
+
+    // 2. Calculate regrets and update probabilities for NEXT iteration
     for (uint64_t i = 0; i < nnodes; ++i)
     {
         double u0 = calculate_utility(game, i, 0);
@@ -111,6 +113,12 @@ uint64_t run_regret_matching_iteration(game_system *game)
 
         double r0 = u0 - u_real;
         double r1 = u1 - u_real;
+
+        // Check if anyone has an incentive to deviate (Instantaneous Regret > 0)
+        // Using a small epsilon for floating point comparisons
+        if (r0 > 1e-9 || r1 > 1e-9) {
+            is_nash = 0;
+        }
 
         game->rs.regrets[2 * i] += r0;
         game->rs.regrets[2 * i + 1] += r1;
@@ -131,7 +139,8 @@ uint64_t run_regret_matching_iteration(game_system *game)
         }
     }
 
-    return active_nodes_count;
+    // Return 1 if NOT converged (not Nash), 0 if converged (Nash)
+    return !is_nash;
 }
 
 ///////////////////////////////////////////
@@ -169,10 +178,11 @@ uint64_t run_fictious_play_iteration(game_system *game){
         game->fs.order[j] = temp;
     }
 
-    uint64_t active_nodes_count = 0;
+    uint64_t change_occurred = 0;
     
     for (size_t k = 0; k < game->num_players; k++){
         uint64_t i = game->fs.order[k];
+        uint64_t old_strategy = game->strategies[i];
 
         double expected_utility_0 = 0.0;
         uint64_t start = game->g->row_ptr[i];
@@ -194,7 +204,10 @@ uint64_t run_fictious_play_iteration(game_system *game){
         } else {
             // printf("utilities: 0 = %lf ; 1 = %lf ; chosen 1\n", expected_utility_0, expected_utility_1);
             game->strategies[i] = 1;
-            active_nodes_count++;
+        }
+
+        if (game->strategies[i] != old_strategy) {
+            change_occurred = 1;
         }
         
         // Sequential Update (Gauss-Seidel)
@@ -205,7 +218,7 @@ uint64_t run_fictious_play_iteration(game_system *game){
     }
     
     game->fs.turn++;
-    return active_nodes_count;
+    return change_occurred;
 }
 
 ///////////////////////////////////////////
