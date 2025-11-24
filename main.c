@@ -6,15 +6,18 @@
 #include "include/algorithm.h"
 #include "include/data_structures.h"
 
-
-
 #define GRAPH_FILENAME "graph_dump.bin"
+
+#define TYPE_REGULAR 0
+#define TYPE_ERDOS   1
+#define TYPE_BARABASI 2
 
 void print_usage(const char *prog_name) {
     printf("Usage: %s [options]\n", prog_name);
     printf("Options:\n");
     printf("  -n <nodes>       Number of nodes (default: 10000)\n");
-    printf("  -k <edges>       Number of edges per node (default: 4)\n");
+    printf("  -k <val>         Degree/Param (Reg: degree, ER: avg degree, BA: m) (default: 4)\n");
+    printf("  -t <type>        Graph Type (0=Regular, 1=Erdos, 2=Barabasi) (default: 0)\n");
     printf("  -i <iterations>  Maximum number of iterations (default: 1000)\n");
     printf("  -a <algorithm>   Algorithm to use (1=BRD, 2=RM, 3=FP) (default: 3)\n");
     printf("  -h               Show this help message\n");
@@ -24,18 +27,26 @@ int main(int argc, char *argv[])
 {
     // Default values
     uint64_t num_nodes = 10000;
-    uint64_t num_edges_per_node = 4;
+    uint64_t k_param = 4;
     uint64_t max_it = 1000;
     int algorithm = ALGO_FP;
+    int graph_type = TYPE_REGULAR;
 
     int opt;
-    while ((opt = getopt(argc, argv, "n:k:i:a:h")) != -1) {
+    while ((opt = getopt(argc, argv, "n:k:i:a:t:h")) != -1) {
         switch (opt) {
             case 'n':
                 num_nodes = strtoull(optarg, NULL, 10);
                 break;
             case 'k':
-                num_edges_per_node = strtoull(optarg, NULL, 10);
+                k_param = strtoull(optarg, NULL, 10);
+                break;
+            case 't':
+                graph_type = atoi(optarg);
+                if (graph_type < 0 || graph_type > 2) {
+                    fprintf(stderr, "Invalid graph type. Use 0, 1, or 2.\n");
+                    return 1;
+                }
                 break;
             case 'i':
                 max_it = strtoull(optarg, NULL, 10);
@@ -60,26 +71,33 @@ int main(int argc, char *argv[])
     graph *g = NULL;
     srand((unsigned int)time(NULL));
 
-    printf("Checking for graph '%s'...\n", GRAPH_FILENAME);
-
-    // decommenta per caricare il dump
-    // g = load_graph_from_file(GRAPH_FILENAME);
-
-    if (g)
-    {
-        printf("Graph loaded successfully!\n");
+    // NOTE: If you want to force regeneration of graph based on type, 
+    // you might want to disable the file loading or save different files for different types.
+    // For now, I will overwrite logic to prefer generation if arguments are specific.
+    
+    printf("Generating graph type %d with %" PRIu64 " nodes and param %" PRIu64 "...\n", graph_type, num_nodes, k_param);
+    
+    if (graph_type == TYPE_REGULAR) {
+        g = generate_random_regular(num_nodes, k_param);
+    } else if (graph_type == TYPE_ERDOS) {
+        // Calculate probability p from average degree k: k = p * (N-1) => p = k / (N-1)
+        double p = (double)k_param / (double)(num_nodes - 1);
+        printf("Erdos-Renyi: calculated p = %lf\n", p);
+        g = generate_erdos_renyi(num_nodes, p);
+    } else if (graph_type == TYPE_BARABASI) {
+        printf("Barabasi-Albert: m = %" PRIu64 "\n", k_param);
+        g = generate_barabasi_albert(num_nodes, k_param);
     }
-    else
+
+    if (!g)
     {
-        printf("Generating new random regular graph with %" PRIu64 " nodes and degree %" PRIu64 "...\n", num_nodes, num_edges_per_node);
-        g = generate_random_regular(num_nodes, num_edges_per_node);
-        if (!g)
-        {
-            fprintf(stderr, "Error: Failed to generate graph.\n");
-            return 1;
-        }
-        save_graph_to_file(g, GRAPH_FILENAME);
+        fprintf(stderr, "Error: Failed to generate graph.\n");
+        return 1;
     }
+    
+    // Save generated graph
+    save_graph_to_file(g, GRAPH_FILENAME);
+
 
     clock_t start_time = clock();
     init_game(&game, g);
@@ -117,7 +135,7 @@ int main(int argc, char *argv[])
             active_count++;
     }
 
-    printf("Cover Size: %ld / %" PRIu64 "\n", active_count, game.num_players);
+    printf("Cover Size: %ld / %" PRIu64 " (%.2f%%)\n", active_count, game.num_players, (double)active_count/game.num_players * 100.0);
     printf("Valid Cover: %s\n", valid ? "YES" : "NO");
     printf("Minimal Local: %s\n", minimal ? "YES" : "NO");
 

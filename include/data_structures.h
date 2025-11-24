@@ -48,12 +48,13 @@ typedef struct
 graph* create_graph(uint64_t num_nodes, uint64_t num_edges);
 void free_graph(graph *g);
 void print_graph(graph *g);
-uint64_t has_edge(graph *g, uint64_t u, uint64_t v);
 
 graph* load_graph_from_file(const char *filename);
 uint64_t save_graph_to_file(graph *g, const char *filename);
-graph* generate_erdos_renyi(uint64_t num_nodes, double p);
+
 graph* generate_random_regular(uint64_t num_nodes, uint64_t degree);
+graph* generate_erdos_renyi(uint64_t num_nodes, double p);
+graph* generate_barabasi_albert(uint64_t num_nodes, uint64_t m);
 
 void init_game(game_system *game, graph *g); 
 void free_game(game_system *game);

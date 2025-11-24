@@ -4,6 +4,11 @@
 #include <time.h>
 #include "../include/data_structures.h"
 
+// Helper struct for temporary edge storage
+typedef struct {
+    uint64_t u;
+    uint64_t v;
+} edge_t;
 
 graph *create_graph(uint64_t num_nodes, uint64_t num_edges)
 {
@@ -207,6 +212,191 @@ graph *generate_random_regular(uint64_t num_nodes, uint64_t degree)
 
     free(stubs);
     free(current_degree);
+    return g;
+}
+
+// ---------------------------------------------------------
+// NEW: Erdos-Renyi Generator
+// ---------------------------------------------------------
+graph *generate_erdos_renyi(uint64_t num_nodes, double p) {
+    // Estimating number of edges for allocation (could overflow if p is large, using dynamic array is safer)
+    // To keep it simple in C, we'll use a dynamic growing array of edges.
+    
+    size_t capacity = num_nodes * 10; 
+    size_t count = 0;
+    edge_t *edge_list = (edge_t *)malloc(capacity * sizeof(edge_t));
+    if(!edge_list) return NULL;
+
+    uint64_t *degrees = (uint64_t *)calloc(num_nodes, sizeof(uint64_t));
+    if(!degrees) { free(edge_list); return NULL; }
+
+    // Generate Edges
+    for (uint64_t i = 0; i < num_nodes; ++i) {
+        for (uint64_t j = i + 1; j < num_nodes; ++j) {
+            double r = (double)rand() / (double)RAND_MAX;
+            if (r < p) {
+                // Add edge
+                if (count >= capacity) {
+                    capacity *= 2;
+                    edge_t *temp = realloc(edge_list, capacity * sizeof(edge_t));
+                    if (!temp) {
+                        free(edge_list);
+                        free(degrees);
+                        return NULL;
+                    }
+                    edge_list = temp;
+                }
+                edge_list[count].u = i;
+                edge_list[count].v = j;
+                count++;
+                degrees[i]++;
+                degrees[j]++;
+            }
+        }
+    }
+
+    // Convert to CSR
+    // Total directed edges in CSR = 2 * undirected edges
+    graph *g = create_graph(num_nodes, count * 2);
+    if (!g) {
+        free(edge_list);
+        free(degrees);
+        return NULL;
+    }
+
+    // Fill row_ptr (prefix sum)
+    g->row_ptr[0] = 0;
+    for (uint64_t i = 0; i < num_nodes; ++i) {
+        g->row_ptr[i+1] = g->row_ptr[i] + degrees[i];
+    }
+
+    // Temporary array to track insertion position for each node
+    uint64_t *current_pos = (uint64_t *)malloc(num_nodes * sizeof(uint64_t));
+    for (uint64_t i = 0; i < num_nodes; ++i) {
+        current_pos[i] = g->row_ptr[i];
+    }
+
+    // Fill col_ind
+    for (size_t i = 0; i < count; ++i) {
+        uint64_t u = edge_list[i].u;
+        uint64_t v = edge_list[i].v;
+
+        g->col_ind[current_pos[u]++] = v;
+        g->col_ind[current_pos[v]++] = u;
+    }
+
+    free(current_pos);
+    free(edge_list);
+    free(degrees);
+
+    return g;
+}
+
+// ---------------------------------------------------------
+// NEW: Barabasi-Albert Generator
+// ---------------------------------------------------------
+graph *generate_barabasi_albert(uint64_t num_nodes, uint64_t m) {
+    if (m < 1 || m >= num_nodes) return NULL;
+
+    // We start with m+1 nodes fully connected (clique) to ensure we have a valid start
+    // Number of edges in initial clique: (m+1)*m / 2
+    // Number of edges added by remaining nodes: (num_nodes - (m+1)) * m
+    
+    uint64_t init_nodes = m + 1;
+    uint64_t approx_edges = (init_nodes * m) / 2 + (num_nodes - init_nodes) * m;
+    
+    // Allocate space for edges
+    edge_t *edge_list = (edge_t *)malloc(approx_edges * sizeof(edge_t));
+    uint64_t edge_count = 0;
+
+    // Repeated nodes array for preferential attachment (stores node ID proportional to degree)
+    // Size approx 2 * num_edges
+    uint64_t *repeated_nodes = (uint64_t *)malloc(approx_edges * 2 * sizeof(uint64_t));
+    uint64_t repeated_count = 0;
+
+    // 1. Initialize with a clique of size m+1
+    for (uint64_t i = 0; i < init_nodes; ++i) {
+        for (uint64_t j = i + 1; j < init_nodes; ++j) {
+            edge_list[edge_count].u = i;
+            edge_list[edge_count].v = j;
+            edge_count++;
+
+            repeated_nodes[repeated_count++] = i;
+            repeated_nodes[repeated_count++] = j;
+        }
+    }
+
+    // 2. Add remaining nodes
+    uint64_t *targets = (uint64_t *)malloc(m * sizeof(uint64_t));
+
+    for (uint64_t i = init_nodes; i < num_nodes; ++i) {
+        // Select m distinct nodes from repeated_nodes
+        uint64_t added = 0;
+        while (added < m) {
+            uint64_t r_idx = rand() % repeated_count;
+            uint64_t target = repeated_nodes[r_idx];
+            
+            // Check for duplicates
+            int duplicate = 0;
+            for (uint64_t k = 0; k < added; ++k) {
+                if (targets[k] == target) {
+                    duplicate = 1;
+                    break;
+                }
+            }
+            if (!duplicate) {
+                targets[added++] = target;
+            }
+        }
+
+        // Add edges connecting new node i to targets
+        for (uint64_t k = 0; k < m; ++k) {
+            uint64_t target = targets[k];
+            edge_list[edge_count].u = i;
+            edge_list[edge_count].v = target;
+            edge_count++;
+
+            repeated_nodes[repeated_count++] = i;
+            repeated_nodes[repeated_count++] = target;
+        }
+    }
+
+    free(targets);
+    free(repeated_nodes);
+
+    // 3. Convert to CSR (Calculate degrees, alloc, fill)
+    uint64_t *degrees = (uint64_t *)calloc(num_nodes, sizeof(uint64_t));
+    for (uint64_t i = 0; i < edge_count; ++i) {
+        degrees[edge_list[i].u]++;
+        degrees[edge_list[i].v]++;
+    }
+
+    graph *g = create_graph(num_nodes, edge_count * 2);
+    
+    // Row pointers
+    g->row_ptr[0] = 0;
+    for (uint64_t i = 0; i < num_nodes; ++i) {
+        g->row_ptr[i+1] = g->row_ptr[i] + degrees[i];
+    }
+
+    // Fill col_ind
+    uint64_t *current_pos = (uint64_t *)malloc(num_nodes * sizeof(uint64_t));
+    for (uint64_t i = 0; i < num_nodes; ++i) {
+        current_pos[i] = g->row_ptr[i];
+    }
+
+    for (uint64_t i = 0; i < edge_count; ++i) {
+        uint64_t u = edge_list[i].u;
+        uint64_t v = edge_list[i].v;
+
+        g->col_ind[current_pos[u]++] = v;
+        g->col_ind[current_pos[v]++] = u;
+    }
+
+    free(current_pos);
+    free(degrees);
+    free(edge_list);
+
     return g;
 }
 
