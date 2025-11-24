@@ -17,6 +17,13 @@
 #define MAX_IT 1000
 #endif
 
+#ifndef NUM_NODES
+#define NUM_NODES 10000
+#endif
+#ifndef NUM_EDGES_PER_NODE
+#define NUM_EDGES_PER_NODE 4
+#endif
+
 int main(void)
 {
     game_system game;
@@ -35,7 +42,7 @@ int main(void)
     else
     {
         printf("Generating new random regular graph...\n");
-        g = generate_random_regular(4, 2);
+        g = generate_random_regular(NUM_NODES, NUM_EDGES_PER_NODE);
         if (!g)
         {
             fprintf(stderr, "Error: Failed to generate graph.\n");
@@ -54,7 +61,7 @@ int main(void)
     init_regret_system(&game);
 #elif CURRENT_ALGORITHM == ALGO_FP
     printf("Algorithm: Fictitious Play (FP)\n");
-    // init_fictitious_play(&game);
+    init_fictious_system(&game);
 #endif
 
     uint64_t converged = 0;
@@ -76,8 +83,9 @@ int main(void)
 #elif CURRENT_ALGORITHM == ALGO_RM
         run_regret_matching_iteration(&game);
 #elif CURRENT_ALGORITHM == ALGO_FP
-        // run_fictitious_play_iteration(&game);
+        run_fictious_play_iteration(&game);
 #endif
+        game.iteration++;
     }
 
     double elapsed = (double)(clock() - start_time) / CLOCKS_PER_SEC;
@@ -100,6 +108,8 @@ int main(void)
 
 #if CURRENT_ALGORITHM == ALGO_RM
     free_regret_system(&game);
+#elif CURRENT_ALGORITHM == ALGO_FP
+    free_fictious_system(&game);
 #endif
 
     free_game(&game);

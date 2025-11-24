@@ -8,9 +8,7 @@ static double get_random_double()
     return (double)rand() / (double)RAND_MAX;
 }
 
-
-double calculate_utility(game_system *game, uint64_t player_id, uint64_t strategy)
-{
+double calculate_utility(game_system *game, uint64_t player_id, uint64_t strategy){
     // Se mi attivo (1), pago il costo fisso
     if (strategy == 1)
         return -COST_SECURITY;
@@ -59,7 +57,6 @@ uint64_t run_best_response_iteration(game_system *game)
         }
     }
 
-    game->iteration++;
     return change_occurred;
 }
 
@@ -134,7 +131,80 @@ uint64_t run_regret_matching_iteration(game_system *game)
         }
     }
 
-    game->iteration++;
+    return active_nodes_count;
+}
+
+///////////////////////////////////////////
+// FICTIOUS PLAY
+///////////////////////////////////////////
+
+void init_fictious_system(game_system *game){
+    game->fs.probs = (double *)calloc(game->num_players * 2, sizeof(double));
+    game->fs.order = (uint64_t *)malloc(game->num_players * sizeof(uint64_t));
+
+    for (uint64_t i = 0; i < game->num_players * 2; ++i){
+        game->fs.probs[i] = 0.5;
+    }
+    for (uint64_t i = 0; i < game->num_players; ++i) {
+        game->fs.order[i] = i;
+    }
+    game->fs.believes = (char *)calloc(game->num_players, sizeof(char));
+    game->fs.turn = 0;
+}
+
+void free_fictious_system(game_system *game){
+    if (game->fs.probs) free(game->fs.probs);
+    if (game->fs.believes) free(game->fs.believes);
+    if (game->fs.order) free(game->fs.order);
+}
+
+uint64_t run_fictious_play_iteration(game_system *game){
+    // Fisher-Yates shuffle
+    for (uint64_t i = game->num_players - 1; i > 0; --i) {
+        uint64_t j = (uint64_t)(get_random_double() * (i + 1));
+        if (j > i) j = i;
+        
+        uint64_t temp = game->fs.order[i];
+        game->fs.order[i] = game->fs.order[j];
+        game->fs.order[j] = temp;
+    }
+
+    uint64_t active_nodes_count = 0;
+    
+    for (size_t k = 0; k < game->num_players; k++){
+        uint64_t i = game->fs.order[k];
+
+        double expected_utility_0 = 0.0;
+        uint64_t start = game->g->row_ptr[i];
+        uint64_t end = game->g->row_ptr[i + 1];
+
+        for (uint64_t m = start; m < end; ++m)
+        {
+            uint64_t neighbor_id = game->g->col_ind[m];
+            double prob_neighbor_0 = game->fs.probs[2 * neighbor_id];
+            expected_utility_0 += prob_neighbor_0 * (-PENALTY_UNSECURED);
+        }
+
+        double expected_utility_1 = -COST_SECURITY;
+
+        // Best Response against empirical distribution
+        if (expected_utility_0 >= expected_utility_1){
+            // printf("utilities: 0 = %lf ; 1 = %lf ; chosen 0\n", expected_utility_0, expected_utility_1);
+            game->strategies[i] = 0;
+        } else {
+            // printf("utilities: 0 = %lf ; 1 = %lf ; chosen 1\n", expected_utility_0, expected_utility_1);
+            game->strategies[i] = 1;
+            active_nodes_count++;
+        }
+        
+        // Sequential Update (Gauss-Seidel)
+        // Updating probabilities immediately allows subsequent players to react to the
+        // updated beliefs within the same iteration, breaking symmetry and preventing oscillation.
+        game->fs.probs[2*i] = (game->fs.probs[2*i] * game->fs.turn + (game->strategies[i] == 0 ? 1.0 : 0.0)) / (game->fs.turn + 1);
+        game->fs.probs[2*i+1] = (game->fs.probs[2*i+1] * game->fs.turn + (game->strategies[i] == 1 ? 1.0 : 0.0)) / (game->fs.turn + 1);
+    }
+    
+    game->fs.turn++;
     return active_nodes_count;
 }
 

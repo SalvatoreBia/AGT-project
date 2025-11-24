@@ -24,10 +24,21 @@ typedef struct
 
 typedef struct
 {
+    double *probs;
+    uint64_t *order;
+    char *believes;
+    uint64_t turn;
+} fictious_system;
+
+
+typedef struct
+{
     graph *g;
     unsigned char *strategies;
     
     regret_system rs;
+    
+    fictious_system fs;
 
     uint64_t num_players;
     uint64_t iteration;
