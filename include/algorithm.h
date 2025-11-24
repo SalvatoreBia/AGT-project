@@ -4,6 +4,12 @@
 #include "data_structures.h"
 #include <stdint.h>
 
+#define ALGO_BRD 1
+#define ALGO_RM 2
+#define ALGO_FP 3
+
+int64_t run_simulation(game_system *game, int algorithm, uint64_t max_it);
+
 double calculate_utility(game_system *game, uint64_t player_id, uint64_t strategy);
 
 uint64_t run_best_response_iteration(game_system *game);

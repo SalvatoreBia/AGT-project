@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <math.h>
 #include "../include/algorithm.h"
@@ -290,4 +291,40 @@ int is_minimal(game_system *game)
 
     free(has_private);
     return minimal;
+}
+
+int64_t run_simulation(game_system *game, int algorithm, uint64_t max_it)
+{
+    uint64_t converged = 0;
+
+    while (game->iteration < max_it)
+    {
+        if (game->iteration % 100 == 0)
+        {
+            printf("--- It %" PRIu64 " ---\n", game->iteration + 1);
+        }
+
+        int change = 0;
+        if (algorithm == ALGO_BRD) {
+            change = run_best_response_iteration(game);
+        } else if (algorithm == ALGO_RM) {
+            change = run_regret_matching_iteration(game);
+        } else if (algorithm == ALGO_FP) {
+            change = run_fictious_play_iteration(game);
+        }
+        
+        if (!change) {
+            converged = 1;
+            printf("Convergence reached at it %" PRIu64 "\n", game->iteration);
+            break;
+        }
+
+        game->iteration++;
+    }
+    
+    if (converged) {
+        return (int64_t)game->iteration;
+    } else {
+        return -1;
+    }
 }

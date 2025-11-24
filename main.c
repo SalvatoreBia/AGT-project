@@ -6,9 +6,7 @@
 #include "include/algorithm.h"
 #include "include/data_structures.h"
 
-#define ALGO_BRD 1
-#define ALGO_RM 2
-#define ALGO_FP 3
+
 
 #define GRAPH_FILENAME "graph_dump.bin"
 
@@ -96,32 +94,8 @@ int main(int argc, char *argv[])
         init_fictious_system(&game);
     }
 
-    uint64_t converged = 0;
-
-    while (game.iteration < max_it)
-    {
-        if (game.iteration % 100 == 0)
-        {
-            printf("--- It %" PRIu64 " ---\n", game.iteration + 1);
-        }
-
-        int change = 0;
-        if (algorithm == ALGO_BRD) {
-            change = run_best_response_iteration(&game);
-        } else if (algorithm == ALGO_RM) {
-            change = run_regret_matching_iteration(&game);
-        } else if (algorithm == ALGO_FP) {
-            change = run_fictious_play_iteration(&game);
-        }
-        
-        if (!change) {
-            converged = 1;
-            printf("Convergence reached at it %" PRIu64 "\n", game.iteration);
-            break;
-        }
-
-        game.iteration++;
-    }
+    int64_t result = run_simulation(&game, algorithm, max_it);
+    uint64_t converged = (result != -1);
 
     double elapsed = (double)(clock() - start_time) / CLOCKS_PER_SEC;
     printf("\nSimulation finished in %.2fs\n", elapsed);
