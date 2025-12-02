@@ -1,5 +1,6 @@
 CC := gcc
-CFLAGS := -Wall -Wextra -Iinclude -g -O3
+CFLAGS := -Wall -Wextra -Iinclude -g -O3 $(shell pkg-config --cflags glib-2.0)
+LDFLAGS := $(shell pkg-config --libs glib-2.0)
 
 SRC := main.c $(wildcard src/*.c)
 OBJ_DIR := build
@@ -15,7 +16,7 @@ dirs:
 	mkdir -p $(OBJ_DIR)/src
 
 $(TARGET): $(OBJ)
-	$(CC) $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 # Pattern rule for .c → .o mapping in build/
 $(OBJ_DIR)/%.o: %.c
