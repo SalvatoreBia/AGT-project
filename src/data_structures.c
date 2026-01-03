@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <inttypes.h>
 #include <string.h>
 #include <time.h>
 #include "../include/data_structures.h"
@@ -49,15 +50,15 @@ void print_graph(graph *g)
 {
     if (!g)
         return;
-    printf("Graph CSR (%lu nodes, %lu edges)\n", g->num_nodes, g->num_edges);
+    printf("Graph CSR (%" PRIu64 " nodes, %" PRIu64 " edges)\n", g->num_nodes, g->num_edges);
 
     uint64_t limit = g->num_nodes > 10 ? 10 : g->num_nodes;
     for (uint64_t i = 0; i < limit; ++i)
     {
-        printf("%lu: ", i);
+        printf("%" PRIu64 ": ", i);
         for (uint64_t j = g->row_ptr[i]; j < g->row_ptr[i + 1]; ++j)
         {
-            printf("%lu ", g->col_ind[j]);
+            printf("%" PRIu64 " ", g->col_ind[j]);
         }
         printf("\n");
     }
@@ -120,7 +121,7 @@ graph *load_graph_from_file(const char *filename)
     }
 
     fclose(f);
-    printf("Graph loaded from %s (%lu nodes, %lu edges)\n", filename, num_nodes, num_edges);
+    printf("Graph loaded from %s (%" PRIu64 " nodes, %" PRIu64 " edges)\n", filename, num_nodes, num_edges);
     return g;
 }
 

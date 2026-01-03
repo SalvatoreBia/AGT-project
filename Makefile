@@ -1,6 +1,18 @@
 CC := gcc
-CFLAGS := -Wall -Wextra -Iinclude -g -O3 $(shell pkg-config --cflags glib-2.0)
-LDFLAGS := $(shell pkg-config --libs glib-2.0)
+# Detect Apple Silicon to fix pkg-config path
+UNAME_S := $(shell uname -s)
+UNAME_M := $(shell uname -m)
+
+PKG_CONFIG_ENV :=
+ifeq ($(UNAME_S),Darwin)
+ifeq ($(UNAME_M),arm64)
+# Force Homebrew path for arm64
+PKG_CONFIG_ENV := PKG_CONFIG_PATH=/opt/homebrew/lib/pkgconfig
+endif
+endif
+
+CFLAGS := -Wall -Wextra -Iinclude -g -O3 $(shell $(PKG_CONFIG_ENV) pkg-config --cflags glib-2.0)
+LDFLAGS := $(shell $(PKG_CONFIG_ENV) pkg-config --libs glib-2.0)
 
 SRC := main.c $(wildcard src/*.c)
 OBJ_DIR := build
