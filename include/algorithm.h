@@ -10,7 +10,7 @@
 
 double calculate_utility(game_system *game, uint64_t player_id, uint64_t strategy);
 
-int64_t run_simulation(game_system *game, int algorithm, uint64_t max_it);
+int64_t run_simulation(game_system *game, int algorithm, uint64_t max_it, int verbose);
 
 uint64_t run_best_response_iteration(game_system *game);
 uint64_t run_regret_matching_iteration(game_system *game);

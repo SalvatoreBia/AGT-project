@@ -230,7 +230,7 @@ int main(int argc, char *argv[])
             init_fictitious_system(&game);
         }
 
-        int64_t result = run_simulation(&game, algorithm, max_it);
+        int64_t result = run_simulation(&game, algorithm, max_it, 1);
         uint64_t converged = (result != -1);
 
         double elapsed = (double)(clock() - start_time) / CLOCKS_PER_SEC;

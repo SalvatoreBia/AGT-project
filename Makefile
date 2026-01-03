@@ -38,5 +38,8 @@ $(OBJ_DIR)/%.o: %.c
 run: all
 	./$(TARGET)
 
+test_1000: $(OBJ_DIR)/test_convergence_1000.o $(OBJ_DIR)/src/algorithm.o $(OBJ_DIR)/src/data_structures.o
+	$(CC) $(CFLAGS) -o $(OBJ_DIR)/test_convergence_1000 $^ $(LDFLAGS)
+
 clean:
 	rm -rf $(OBJ_DIR)

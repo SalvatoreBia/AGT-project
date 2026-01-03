@@ -348,12 +348,12 @@ int is_minimal(game_system *game)
  * STRATEGIC GAME: SIMULATION RUNNER
  * ============================================================================ */
 
-int64_t run_simulation(game_system *game, int algorithm, uint64_t max_it)
+int64_t run_simulation(game_system *game, int algorithm, uint64_t max_it, int verbose)
 {
     uint64_t converged = 0;
     int no_change_streak = 0;
     uint64_t last_restart_it = 0;
-    const uint64_t restart_interval = 10000;
+    const uint64_t restart_interval = 1000;
 
     while (game->iteration < max_it)
     {
@@ -361,12 +361,14 @@ int64_t run_simulation(game_system *game, int algorithm, uint64_t max_it)
         if (algorithm == ALGO_FP && 
             (game->iteration - last_restart_it) >= restart_interval)
         {
-            printf("--- It %" PRIu64 " : Random Restart Triggered! ---\n", game->iteration);
+            if (verbose)
+                printf("--- It %" PRIu64 " : Random Restart Triggered! ---\n", game->iteration);
             reset_fictitious_system(game);
             last_restart_it = game->iteration;
             no_change_streak = 0;
         }
-        if (game->iteration % 1000 == 0)
+        
+        if (verbose && game->iteration % 1000 == 0)
         {
             printf("--- It %" PRIu64 " ---\n", game->iteration + 1);
         }
@@ -394,10 +396,11 @@ int64_t run_simulation(game_system *game, int algorithm, uint64_t max_it)
             no_change_streak = 0;
         }
 
-        if (no_change_streak >= 100) // Require streak of 100 unchanged iterations to allow beliefs to saturate
+        if (no_change_streak >= 500) // Require streak of 500 unchanged iterations to allow beliefs to saturate
         {
             converged = 1;
-            printf("Convergence reached at it %" PRIu64 "\n", game->iteration);
+            if (verbose)
+                printf("Convergence reached at it %" PRIu64 "\n", game->iteration);
             break;
         }
 
