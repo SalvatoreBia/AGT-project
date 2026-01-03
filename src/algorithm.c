@@ -165,26 +165,34 @@ uint64_t run_regret_matching_iteration(game_system *game)
  * STRATEGIC GAME: FICTITIOUS PLAY (FP)
  * ============================================================================ */
 
-void init_fictitious_system(game_system *game)
+void reset_fictitious_system(game_system *game)
 {
-    game->fs.counts = (uint64_t *)calloc(game->num_players, sizeof(uint64_t));
-    game->fs.believes = (double *)calloc(game->num_players, sizeof(double));
+    // Set a fictitious history of length 100 to break symmetry
+    game->fs.turn = 100;
     
     // Initialize with random counts to create heterogeneous priors around the critical threshold
     // Threshold is approx 0.975 for Cost=1, Penalty=10, Degree=4.
     // We use turn=100 and counts in [90, 100] to seed some below and some above/near.
-    game->fs.turn = 100;
-    
     for (uint64_t i = 0; i < game->num_players; ++i)
     {
         // Random count between 90 and 100
         uint64_t variance = rand() % 11; // 0 to 10
         game->fs.counts[i] = 90 + variance;
         
-        // Calculate initial belief
+        // Calculate initial belief based on this fictitious history
         game->fs.believes[i] = (double)game->fs.counts[i] / (double)game->fs.turn;
-    }
 
+        // Also randomize initial strategy to help escape basin
+        game->strategies[i] = (rand() % 2);
+    }
+}
+
+void init_fictitious_system(game_system *game)
+{
+    game->fs.counts = (uint64_t *)calloc(game->num_players, sizeof(uint64_t));
+    game->fs.believes = (double *)calloc(game->num_players, sizeof(double));
+    
+    reset_fictitious_system(game);
 }
 
 void free_fictitious_system(game_system *game)
@@ -344,9 +352,20 @@ int64_t run_simulation(game_system *game, int algorithm, uint64_t max_it)
 {
     uint64_t converged = 0;
     int no_change_streak = 0;
+    uint64_t last_restart_it = 0;
+    const uint64_t restart_interval = 10000;
 
     while (game->iteration < max_it)
     {
+        // Check for Random Restart if not converged for a long time
+        if (algorithm == ALGO_FP && 
+            (game->iteration - last_restart_it) >= restart_interval)
+        {
+            printf("--- It %" PRIu64 " : Random Restart Triggered! ---\n", game->iteration);
+            reset_fictitious_system(game);
+            last_restart_it = game->iteration;
+            no_change_streak = 0;
+        }
         if (game->iteration % 1000 == 0)
         {
             printf("--- It %" PRIu64 " ---\n", game->iteration + 1);
