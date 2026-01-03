@@ -14,7 +14,8 @@ int64_t run_simulation(game_system *game, int algorithm, uint64_t max_it);
 
 uint64_t run_best_response_iteration(game_system *game);
 uint64_t run_regret_matching_iteration(game_system *game);
-uint64_t run_fictious_play_iteration(game_system *game);
+
+uint64_t run_fictitious_play_iteration(game_system *game);
 
 int is_valid_cover(game_system *game);
 int is_minimal(game_system *game);
@@ -22,8 +23,8 @@ int is_minimal(game_system *game);
 void init_regret_system(game_system *game);
 void free_regret_system(game_system *game);
 
-void init_fictious_system(game_system *game);
-void free_fictious_system(game_system *game);
+void init_fictitious_system(game_system *game);
+void free_fictitious_system(game_system *game);
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

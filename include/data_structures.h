@@ -28,7 +28,7 @@ typedef struct
     uint64_t *order;
     char *believes;
     uint64_t turn;
-} fictious_system;
+} fictitious_system;
 
 
 typedef struct
@@ -38,7 +38,7 @@ typedef struct
     
     regret_system rs;
     
-    fictious_system fs;
+    fictitious_system fs;
 
     uint64_t num_players;
     uint64_t iteration;

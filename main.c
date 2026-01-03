@@ -227,7 +227,7 @@ int main(int argc, char *argv[])
         else if (algorithm == ALGO_FP)
         {
             printf("Algorithm: Fictitious Play (FP)\n");
-            init_fictious_system(&game);
+            init_fictitious_system(&game);
         }
 
         int64_t result = run_simulation(&game, algorithm, max_it);
@@ -267,7 +267,7 @@ int main(int argc, char *argv[])
         }
         else if (algorithm == ALGO_FP)
         {
-            free_fictious_system(&game);
+            free_fictitious_system(&game);
         }
 
         free_game(&game);

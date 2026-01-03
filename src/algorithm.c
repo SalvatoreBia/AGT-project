@@ -165,7 +165,7 @@ uint64_t run_regret_matching_iteration(game_system *game)
  * STRATEGIC GAME: FICTITIOUS PLAY (FP)
  * ============================================================================ */
 
-void init_fictious_system(game_system *game)
+void init_fictitious_system(game_system *game)
 {
     game->fs.probs = (double *)calloc(game->num_players * 2, sizeof(double));
     game->fs.order = (uint64_t *)malloc(game->num_players * sizeof(uint64_t));
@@ -185,14 +185,14 @@ void init_fictious_system(game_system *game)
     }
 }
 
-void free_fictious_system(game_system *game)
+void free_fictitious_system(game_system *game)
 {
     free(game->fs.probs);
     free(game->fs.believes);
     free(game->fs.order);
 }
 
-uint64_t run_fictious_play_iteration(game_system *game)
+uint64_t run_fictitious_play_iteration(game_system *game)
 {
     // Randomize player order using Fisher-Yates shuffle
     for (uint64_t i = game->num_players - 1; i > 0; --i)
@@ -343,7 +343,7 @@ int64_t run_simulation(game_system *game, int algorithm, uint64_t max_it)
         }
         else if (algorithm == ALGO_FP)
         {
-            change = run_fictious_play_iteration(game);
+            change = run_fictitious_play_iteration(game);
         }
 
         if (!change)
