@@ -167,82 +167,101 @@ uint64_t run_regret_matching_iteration(game_system *game)
 
 void init_fictitious_system(game_system *game)
 {
-    game->fs.probs = (double *)calloc(game->num_players * 2, sizeof(double));
-    game->fs.order = (uint64_t *)malloc(game->num_players * sizeof(uint64_t));
-    game->fs.believes = (char *)calloc(game->num_players, sizeof(char));
-    game->fs.turn = 0;
-
-    // Initialize with uniform probabilities
-    for (uint64_t i = 0; i < game->num_players * 2; ++i)
-    {
-        game->fs.probs[i] = 0.5;
-    }
+    game->fs.counts = (uint64_t *)calloc(game->num_players, sizeof(uint64_t));
+    game->fs.believes = (double *)calloc(game->num_players, sizeof(double));
     
-    // Initialize player order
+    // Initialize with random counts to create heterogeneous priors around the critical threshold
+    // Threshold is approx 0.975 for Cost=1, Penalty=10, Degree=4.
+    // We use turn=100 and counts in [90, 100] to seed some below and some above/near.
+    game->fs.turn = 100;
+    
     for (uint64_t i = 0; i < game->num_players; ++i)
     {
-        game->fs.order[i] = i;
+        // Random count between 90 and 100
+        uint64_t variance = rand() % 11; // 0 to 10
+        game->fs.counts[i] = 90 + variance;
+        
+        // Calculate initial belief
+        game->fs.believes[i] = (double)game->fs.counts[i] / (double)game->fs.turn;
     }
+
 }
 
 void free_fictitious_system(game_system *game)
 {
-    free(game->fs.probs);
+    free(game->fs.counts);
     free(game->fs.believes);
-    free(game->fs.order);
 }
 
 uint64_t run_fictitious_play_iteration(game_system *game)
 {
-    // Randomize player order using Fisher-Yates shuffle
-    for (uint64_t i = game->num_players - 1; i > 0; --i)
+    // printf("DEBUG: FP iteration start, turn=%" PRIu64 "\n", game->fs.turn);
+    uint64_t n = game->num_players;
+    
+    // 1. Update Beliefs
+    // Update beliefs based on accumulated history
+    for (uint64_t i = 0; i < n; ++i)
     {
-        uint64_t j = (uint64_t)(get_random_double() * (i + 1));
-        if (j > i)
-            j = i;
-
-        uint64_t temp = game->fs.order[i];
-        game->fs.order[i] = game->fs.order[j];
-        game->fs.order[j] = temp;
+        // counts[i] stores how many times player i played Strategy 1 (Security)
+        game->fs.believes[i] = (double)game->fs.counts[i] / (double)game->fs.turn;
     }
 
     uint64_t change_occurred = 0;
+    unsigned char *next_strategies = malloc(n * sizeof(unsigned char));
 
-    // Process players in random order
-    for (size_t k = 0; k < game->num_players; k++)
+    // 2. Best Response against Beliefs
+    for (uint64_t i = 0; i < n; ++i)
     {
-        uint64_t i = game->fs.order[k];
-        uint64_t old_strategy = game->strategies[i];
+        // Expected Utility of playing Strategy 1 (Security)
+        // Cost is fixed -1.0
+        double eu_1 = -COST_SECURITY; 
 
-        // Calculate expected utility for strategy 0
-        double expected_utility_0 = 0.0;
+        // Expected Utility of playing Strategy 0 (No Security)
+        // Sum of (-PENALTY_UNSECURED * Prop(Neighbor plays 0))
+        double eu_0 = 0.0;
+        
         uint64_t start = game->g->row_ptr[i];
         uint64_t end = game->g->row_ptr[i + 1];
 
-        for (uint64_t m = start; m < end; ++m)
+        for (uint64_t k = start; k < end; ++k)
         {
-            uint64_t neighbor_id = game->g->col_ind[m];
-            double prob_neighbor_0 = game->fs.probs[2 * neighbor_id];
-            expected_utility_0 += prob_neighbor_0 * (-PENALTY_UNSECURED);
+            uint64_t neighbor = game->g->col_ind[k];
+            // Probability neighbor plays 0 = 1.0 - Probability neighbor plays 1 (belief)
+            double prob_neighbor_0 = 1.0 - game->fs.believes[neighbor];
+            eu_0 -= PENALTY_UNSECURED * prob_neighbor_0;
         }
 
-        double expected_utility_1 = -COST_SECURITY;
-
-        // Best response against empirical distribution
-        game->strategies[i] = (expected_utility_0 >= expected_utility_1) ? 0 : 1;
-
-        if (game->strategies[i] != old_strategy)
+        // Choose best strategy
+        // If tied, sticking to current or default preference (usually 1 if equal avoids penalty?)
+        // Here strict inequality for change:
+        if (eu_1 > eu_0)
+        {
+            next_strategies[i] = 1;
+        }
+        else
+        {
+            next_strategies[i] = 0;
+        }
+        
+        if (next_strategies[i] != game->strategies[i])
         {
             change_occurred = 1;
         }
-
-        // Sequential update (Gauss-Seidel): update beliefs immediately
-        // This allows subsequent players to react to updated beliefs within the same iteration
-        game->fs.probs[2 * i] = (game->fs.probs[2 * i] * game->fs.turn + (game->strategies[i] == 0 ? 1.0 : 0.0)) / (game->fs.turn + 1);
-        game->fs.probs[2 * i + 1] = (game->fs.probs[2 * i + 1] * game->fs.turn + (game->strategies[i] == 1 ? 1.0 : 0.0)) / (game->fs.turn + 1);
     }
 
+    // 3. Update State
+    // Apply strategies and update history counts
+    for (uint64_t i = 0; i < n; ++i)
+    {
+        game->strategies[i] = next_strategies[i];
+        if (game->strategies[i] == 1)
+        {
+            game->fs.counts[i]++;
+        }
+    }
     game->fs.turn++;
+
+    free(next_strategies);
     return change_occurred;
 }
 
@@ -324,10 +343,11 @@ int is_minimal(game_system *game)
 int64_t run_simulation(game_system *game, int algorithm, uint64_t max_it)
 {
     uint64_t converged = 0;
+    int no_change_streak = 0;
 
     while (game->iteration < max_it)
     {
-        if (game->iteration % 100 == 0)
+        if (game->iteration % 1000 == 0)
         {
             printf("--- It %" PRIu64 " ---\n", game->iteration + 1);
         }
@@ -347,6 +367,15 @@ int64_t run_simulation(game_system *game, int algorithm, uint64_t max_it)
         }
 
         if (!change)
+        {
+            no_change_streak++;
+        }
+        else
+        {
+            no_change_streak = 0;
+        }
+
+        if (no_change_streak >= 100) // Require streak of 100 unchanged iterations to allow beliefs to saturate
         {
             converged = 1;
             printf("Convergence reached at it %" PRIu64 "\n", game->iteration);

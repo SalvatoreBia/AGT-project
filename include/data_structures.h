@@ -24,9 +24,8 @@ typedef struct
 
 typedef struct
 {
-    double *probs;
-    uint64_t *order;
-    char *believes;
+    uint64_t *counts;
+    double *believes;
     uint64_t turn;
 } fictitious_system;
 
