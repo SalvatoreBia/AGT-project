@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include "include/algorithm.h"
 #include "include/data_structures.h"
+#include "include/min_cost_flow.h"
 
 #define GRAPH_FILENAME "graph_dump.bin"
 
@@ -261,6 +262,13 @@ int main(int argc, char *argv[])
         printf("Valid Cover: %s\n", valid ? "YES" : "NO");
         printf("Minimal Local: %s\n", minimal ? "YES" : "NO");
 
+        // Assuming 'g' is your graph and 'security_set' is the result from Part 1/2
+        // Run Case 1: Infinite Capacity
+        run_part3_matching_market(g, game.strategies, 0);
+
+        // Run Case 2: Limited Capacity
+        run_part3_matching_market(g, game.strategies, 1);
+
         if (algorithm == ALGO_RM)
         {
             free_regret_system(&game);
@@ -272,6 +280,7 @@ int main(int argc, char *argv[])
 
         free_game(&game);
         free_graph(g);
+
     }
 
     return 0;
