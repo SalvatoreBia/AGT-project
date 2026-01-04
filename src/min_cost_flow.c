@@ -239,46 +239,11 @@ static void verify_matching_constraints(flow_network *fn, int *budgets,
 
 // --- Part 3 Wrapper Implementation ---
 
-void run_part3_matching_market(graph *g, unsigned char *security_set, int limited_capacity) {
-    printf("\n=== PART 3: RESOURCE ALLOCATION (Min-Cost Flow) ===\n");
-    printf("Mode: %s Capacity\n", limited_capacity ? "Limited" : "Infinite");
-
-    // 1. Identify Buyers (Players in Security Set)
-    int *buyers = malloc(g->num_nodes * sizeof(int));
-    int num_buyers = 0;
-    for(uint64_t i=0; i<g->num_nodes; i++) {
-        if(security_set[i]) {
-            buyers[num_buyers++] = i;
-        }
-    }
+static void solve_matching_limited_capacity(int* buyers, int num_buyers, int* budgets, 
+                                            vendor_t* vendors, int num_vendors) 
+{
+    printf("Strategy: Min-Cost Max-Flow (Limited Capacity)\n");
     
-    if (num_buyers == 0) {
-        printf("No buyers in security set. Skipping.\n");
-        free(buyers);
-        return;
-    }
-
-    // 2. Generate Random Budgets for Buyers
-    int *budgets = malloc(num_buyers * sizeof(int));
-    for(int i=0; i<num_buyers; i++) {
-        budgets[i] = (rand() % 100) + 1; // 1 to 100
-    }
-
-    // 3. Generate Random Vendors
-    // Let's assume number of vendors is roughly 1/2 of number of buyers for interesting competition
-    int num_vendors = (num_buyers / 2) + 1; 
-    vendor_t *vendors = malloc(num_vendors * sizeof(vendor_t));
-
-    for(int i=0; i<num_vendors; i++) {
-        vendors[i].price = (rand() % 100) + 1;    // Price 1-100
-        vendors[i].quality = (rand() % 10) + 1;   // Quality 1-10
-        if (limited_capacity) {
-            vendors[i].capacity = (rand() % 5) + 1; // 1 to 5 items
-        } else {
-            vendors[i].capacity = num_buyers;     // effectively infinite
-        }
-    }
-
     // 4. Build Flow Network
     // Nodes: 0 (Source), 1..B (Buyers), B+1..B+V (Vendors), B+V+1 (Sink)
     int s = 0;
@@ -320,25 +285,95 @@ void run_part3_matching_market(graph *g, unsigned char *security_set, int limite
     printf("Total Matched: %d / %d buyers\n", total_flow, num_buyers);
     printf("Total Social Welfare: %.2f\n", max_welfare);
 
-    // Optional: Reconstruct matching to see who bought what
-    // Iterate over Buyer nodes
-    /*
+    verify_matching_constraints(fn, budgets, vendors, num_buyers, num_vendors);
+    free_flow_network(fn);
+}
+
+static void solve_matching_infinite_capacity(int* buyers, int num_buyers, int* budgets, 
+                                             vendor_t* vendors, int num_vendors) 
+{
+    printf("Strategy: Greedy (Infinite Capacity)\n");
+    
+    int total_matched = 0;
+    double total_welfare = 0.0;
+    
+    // For infinite capacity, capacity constraints don't matter.
+    // Each buyer simply greedily picks the vendor that maximizes their utility,
+    // provided the vendor is affordable.
+    
     for(int i=0; i<num_buyers; i++) {
-        int u = i + 1;
-        for(int k=0; k<fn->adj[u].count; k++) {
-            flow_edge e = fn->adj[u].edges[k];
-            // If edge goes to a vendor (range check) and has 0 residual cap (meaning flow passed)
-            if (e.to > num_buyers && e.to <= num_buyers + num_vendors && e.cap == 0) {
-                int v_idx = e.to - num_buyers - 1;
-                printf("  Buyer %d (Bud: %d) -> Vendor %d (Price: %d, Q: %d)\n", 
-                       buyers[i], budgets[i], v_idx, vendors[v_idx].price, vendors[v_idx].quality);
+        double best_utility = -1e18; // Negative infinity
+        int picked_vendor = -1;
+        
+        for(int j=0; j<num_vendors; j++) {
+            if(budgets[i] >= vendors[j].price) {
+                double utility = (double)(budgets[i] - vendors[j].price) + (vendors[j].quality * 10.0);
+                if(utility > best_utility) {
+                    best_utility = utility;
+                    picked_vendor = j;
+                }
             }
         }
+        
+        if (picked_vendor != -1) {
+            total_matched++;
+            total_welfare += best_utility;
+        }
     }
-    */
-    verify_matching_constraints(fn, budgets, vendors, num_buyers, num_vendors);
+    
+    printf("Matching Calculation Complete.\n");
+    printf("Total Matched: %d / %d buyers\n", total_matched, num_buyers);
+    printf("Total Social Welfare: %.2f\n", total_welfare);
+}
+
+void run_part3_matching_market(graph *g, unsigned char *security_set, int limited_capacity) {
+    printf("\n=== PART 3: RESOURCE ALLOCATION (Min-Cost Flow) ===\n");
+    printf("Mode: %s Capacity\n", limited_capacity ? "Limited" : "Infinite");
+
+    // 1. Identify Buyers (Players in Security Set)
+    int *buyers = malloc(g->num_nodes * sizeof(int));
+    int num_buyers = 0;
+    for(uint64_t i=0; i<g->num_nodes; i++) {
+        if(security_set[i]) {
+            buyers[num_buyers++] = i;
+        }
+    }
+    
+    if (num_buyers == 0) {
+        printf("No buyers in security set. Skipping.\n");
+        free(buyers);
+        return;
+    }
+
+    // 2. Generate Random Budgets for Buyers
+    int *budgets = malloc(num_buyers * sizeof(int));
+    for(int i=0; i<num_buyers; i++) {
+        budgets[i] = (rand() % 100) + 1; // 1 to 100
+    }
+
+    // 3. Generate Random Vendors
+    // Let's assume number of vendors is roughly 1/2 of number of buyers for interesting competition
+    int num_vendors = (num_buyers / 2) + 1; 
+    vendor_t *vendors = malloc(num_vendors * sizeof(vendor_t));
+
+    for(int i=0; i<num_vendors; i++) {
+        vendors[i].price = (rand() % 100) + 1;    // Price 1-100
+        vendors[i].quality = (rand() % 10) + 1;   // Quality 1-10
+        if (limited_capacity) {
+            vendors[i].capacity = (rand() % 5) + 1; // 1 to 5 items
+        } else {
+            vendors[i].capacity = num_buyers;     // effectively infinite
+        }
+    }
+    
+    // Dispatch to Solver
+    if (limited_capacity) {
+        solve_matching_limited_capacity(buyers, num_buyers, budgets, vendors, num_vendors);
+    } else {
+        solve_matching_infinite_capacity(buyers, num_buyers, budgets, vendors, num_vendors);
+    }
+
     // Cleanup
-    free_flow_network(fn);
     free(buyers);
     free(budgets);
     free(vendors);

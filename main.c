@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
     // Default values
     uint64_t num_nodes = 10000;
     uint64_t k_param = 4;
-    uint64_t max_it = 10000;
+    uint64_t max_it = 100000;
     int algorithm = ALGO_FP;
     int graph_type = TYPE_REGULAR;
     int shapley_version = 3;
