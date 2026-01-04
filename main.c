@@ -6,6 +6,7 @@
 #include "include/algorithm.h"
 #include "include/data_structures.h"
 #include "include/min_cost_flow.h"
+#include "include/auction.h"
 
 #define GRAPH_FILENAME "graph_dump.bin"
 
@@ -268,6 +269,10 @@ int main(int argc, char *argv[])
 
         // Run Case 2: Limited Capacity
         run_part3_matching_market(g, game.strategies, 1);
+
+        // === PART 4: VCG AUCTION ===
+        // Uses the same 'final_security_set' pointer we set up for Part 3
+        run_part4_vcg_auction(g, game.strategies);
 
         if (algorithm == ALGO_RM)
         {
