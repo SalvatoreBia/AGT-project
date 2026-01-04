@@ -3,6 +3,7 @@
 #include <time.h>
 #include <inttypes.h>
 #include <unistd.h>
+#include <string.h>
 #include "include/algorithm.h"
 #include "include/data_structures.h"
 #include "include/min_cost_flow.h"
@@ -26,6 +27,7 @@ void print_usage(const char *prog_name)
     printf("  -i <iterations>  Maximum number of iterations (default: 1000)\n");
     printf("  -a <algorithm>   Algorithm to use (1=BRD, 2=RM, 3=FP, 4=Shapley) (default: 3)\n");
     printf("  -v <version>     Characteristic function version for Shapley (1, 2, or 3) (default: 3)\n");
+    printf("  -c <capacity>    Capacity Mode (0=Infinite, 1=Limited, 2=Both) (default: 0)\n");
     printf("  -h               Show this help message\n");
 }
 
@@ -34,13 +36,14 @@ int main(int argc, char *argv[])
     // Default values
     uint64_t num_nodes = 10000;
     uint64_t k_param = 4;
-    uint64_t max_it = 2000000;
+    uint64_t max_it = 10000;
     int algorithm = ALGO_FP;
     int graph_type = TYPE_REGULAR;
     int shapley_version = 3;
+    int capacity_mode = 0; // 0=Inf, 1=Lim, 2=Both
 
     int opt;
-    while ((opt = getopt(argc, argv, "n:k:i:a:t:v:h")) != -1)
+    while ((opt = getopt(argc, argv, "n:k:i:a:t:v:c:h")) != -1)
     {
         switch (opt)
         {
@@ -74,6 +77,14 @@ int main(int argc, char *argv[])
             if (shapley_version < 1 || shapley_version > 3)
             {
                 fprintf(stderr, "Invalid version. Use 1, 2, or 3.\n");
+                return 1;
+            }
+            break;
+        case 'c':
+            capacity_mode = atoi(optarg);
+            if (capacity_mode < 0 || capacity_mode > 2)
+            {
+                fprintf(stderr, "Invalid capacity mode. Use 0, 1, or 2.\n");
                 return 1;
             }
             break;
@@ -136,7 +147,8 @@ int main(int argc, char *argv[])
         double *shapley_values = calculate_shapley_values(g, (int)max_it, shapley_version);
 
         // Costruisci security set
-        unsigned char *security_set = build_security_set_from_shapley(g, shapley_values);
+        // NOTE: assigning to local variable first, then we will use a common pointer later
+        unsigned char *shapley_set = build_security_set_from_shapley(g, shapley_values);
 
         double elapsed = (double)(clock() - start_time) / CLOCKS_PER_SEC;
         printf("\nShapley computation finished in %.2fs\n", elapsed);
@@ -145,7 +157,7 @@ int main(int argc, char *argv[])
         uint64_t active_count = 0;
         for (uint64_t i = 0; i < g->num_nodes; ++i)
         {
-            if (security_set[i])
+            if (shapley_set[i])
                 active_count++;
         }
 
@@ -154,7 +166,7 @@ int main(int argc, char *argv[])
         size_t idx = 0;
         for (uint64_t i = 0; i < g->num_nodes; ++i)
         {
-            if (security_set[i])
+            if (shapley_set[i])
             {
                 coalition[idx++] = i;
             }
@@ -202,14 +214,43 @@ int main(int argc, char *argv[])
         {
             printf("  %2" PRIu64 ". Node %" PRIu64 ": %.6f %s\n", 
                    i + 1, sorted[i].id, sorted[i].value,
-                   security_set[sorted[i].id] ? "(in set)" : "");
+                   shapley_set[sorted[i].id] ? "(in set)" : "");
         }
 
         free(coalition);
         free(sorted);
         free(shapley_values);
-        free(security_set);
-        free_graph(g);
+
+        // IMPORTANT: We do NOT free shapley_set here, we will use it for Part 3/4
+        // But since we need a common interface, let's just run parts here or assign to a common pointer.
+        // To keep clean decoupling, let's assign to a pointer declared outside or trigger parts here? 
+        // Better: We will fall through to common code.
+        // Assign to a variable visible outside. But 'security_set' name conflicts if we just did that.
+        // Let's rely on a common 'final_set' pointer.
+        
+        // Hack: Since 'game' variable is local to main but initialized only in else, 
+        // we need a common pointer for the final security set array.
+        
+        // We will execute the parts AT THE END using this array.
+        // But wait, shapley_set is malloc'ed, game.strategies is malloc'ed.
+        // We need to manage memory.
+        
+        // Let's use a goto or simply continue execution.
+        // We need to store the result in a common place.
+        
+        // Let's allocate a new array for the unified result? Or just point to it.
+        // Simplest: use 'game.strategies' is not available here.
+        // Wait, game_system game; IS declared at top of main.
+        // So we can populate game.strategies manually for Shapley case!
+        
+        init_game(&game, g); // Reset game struct (allocates strategies)
+        // Copy shapley_set to strategies
+        memcpy(game.strategies, shapley_set, g->num_nodes * sizeof(unsigned char));
+        free(shapley_set);
+        
+        // Mark as converged for logic consistency
+        // game.strategies is now populated.
+
     }
     else
     {
@@ -263,17 +304,6 @@ int main(int argc, char *argv[])
         printf("Valid Cover: %s\n", valid ? "YES" : "NO");
         printf("Minimal Local: %s\n", minimal ? "YES" : "NO");
 
-        // Assuming 'g' is your graph and 'security_set' is the result from Part 1/2
-        // Run Case 1: Infinite Capacity
-        run_part3_matching_market(g, game.strategies, 0);
-
-        // Run Case 2: Limited Capacity
-        run_part3_matching_market(g, game.strategies, 1);
-
-        // === PART 4: VCG AUCTION ===
-        // Uses the same 'final_security_set' pointer we set up for Part 3
-        run_part4_vcg_auction(g, game.strategies);
-
         if (algorithm == ALGO_RM)
         {
             free_regret_system(&game);
@@ -283,10 +313,25 @@ int main(int argc, char *argv[])
             free_fictitious_system(&game);
         }
 
-        free_game(&game);
-        free_graph(g);
+    } // End of if/else (Shapley vs Game)
 
+    // === COMMON POST-PROCESSING (Parts 3 & 4) ===
+    // At this point, game.strategies (and game.g) should be populated with the result.
+    
+    // Run Matching Market (Part 3)
+    if (capacity_mode == 0 || capacity_mode == 2) {
+        run_part3_matching_market(g, game.strategies, 0); // Infinite
     }
+    if (capacity_mode == 1 || capacity_mode == 2) {
+        run_part3_matching_market(g, game.strategies, 1); // Limited
+    }
+
+    // Run VCG Auction (Part 4)
+    run_part4_vcg_auction(g, game.strategies);
+
+    // Final Cleanup
+    free_game(&game);
+    free_graph(g);
 
     return 0;
 }
