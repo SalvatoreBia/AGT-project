@@ -5,7 +5,9 @@
 #include <limits.h>
 #include <stdint.h>
 #include <time.h>
+#include <time.h>
 #include "../include/min_cost_flow.h"
+#include "../include/logging.h"
 
 #define INF_COST 1e9
 #define INF_CAP  1000000
@@ -165,7 +167,15 @@ static double min_cost_max_flow(flow_network *fn, int s, int t, int *flow_out) {
             total_cost += push * fn->adj[prev].edges[idx].cost;
             curr = prev;
         }
+
         total_flow += push;
+        
+        // Log iteration?
+        LOG_P3_ITER(0, push, (double)push * (total_cost/total_flow)); // Approximation or just log push?
+        // Actually cost per unit for this path is (total_cost increment / push).
+        // But we don't track incremental cost easily here without diff.
+        // Let's just log total_flow so far.
+        LOG_P3_ITER(total_flow, push, total_cost);
     }
 
     free(dist);
@@ -280,6 +290,25 @@ static void solve_matching_limited_capacity(int* buyers, int num_buyers, int* bu
     double min_cost = min_cost_max_flow(fn, s, t, &total_flow);
     double max_welfare = -min_cost;
 
+    LOG_P3_MATCH(total_flow, num_buyers, 0, 0, max_welfare); // Abuse arguments or make generic? 
+    // Wait, let's just log the summary as a 'match' event with special ID?
+    // Or iterate over the flows to see who matched whom.
+    
+    // Log individual matches by inspecting residual capacity
+    for(int i=0; i<num_buyers; i++) {
+        int u = i + 1;
+        for(int k=0; k<fn->adj[u].count; k++) {
+            flow_edge e = fn->adj[u].edges[k];
+             if (e.to > num_buyers && e.to <= num_buyers + num_vendors) {
+                if (e.cap == 0) { // Flow usage = 1 (Matched)
+                    int v_idx = e.to - num_buyers - 1;
+                    double util = (double)(budgets[i] - vendors[v_idx].price) + (vendors[v_idx].quality * 10.0);
+                    LOG_P3_MATCH(u, v_idx, budgets[i], vendors[v_idx].price, util);
+                }
+             }
+        }
+    }
+
     // 6. Print Results
     printf("Matching Calculation Complete.\n");
     printf("Total Matched: %d / %d buyers\n", total_flow, num_buyers);
@@ -318,6 +347,7 @@ static void solve_matching_infinite_capacity(int* buyers, int num_buyers, int* b
         if (picked_vendor != -1) {
             total_matched++;
             total_welfare += best_utility;
+            LOG_P3_MATCH(i+1, picked_vendor, budgets[i], vendors[picked_vendor].price, best_utility);
         }
     }
     
@@ -368,10 +398,13 @@ void run_part3_matching_market(graph *g, unsigned char *security_set, int limite
     
     // Dispatch to Solver
     if (limited_capacity) {
+        LOG_P3_START("Limited");
         solve_matching_limited_capacity(buyers, num_buyers, budgets, vendors, num_vendors);
     } else {
+        LOG_P3_START("Infinite");
         solve_matching_infinite_capacity(buyers, num_buyers, budgets, vendors, num_vendors);
     }
+    LOG_STEP_END();
 
     // Cleanup
     free(buyers);

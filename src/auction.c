@@ -2,7 +2,9 @@
 #include <stdlib.h>
 #include <limits.h>
 #include <time.h>
+#include <time.h>
 #include "../include/auction.h"
+#include "../include/logging.h"
 
 #define INF_DIST 1e18
 #define PENALTY_COST 200.0  // Cost added if traversing an unsecure node
@@ -139,13 +141,19 @@ void run_part4_vcg_auction(graph *g, unsigned char *security_set) {
     printf("Request: Path %d -> %d\n", s, t);
     printf("Utility: Minimize (Sum of Bids) + %.0f per Unsecure Node\n", PENALTY_COST);
 
+    LOG_P4_START(s, t);
+
     // 3. Find Optimal Path (The Allocation)
     path_res_t opt = find_shortest_path(g, s, t, bids, security_set, -1);
 
     if (opt.length == 0) {
         printf("No path exists.\n");
+        LOG_MSG("No VCG path found");
+        LOG_STEP_END();
         free(bids); return;
     }
+
+    LOG_P4_PATH("winner", opt.nodes, opt.length, opt.total_cost);
 
     printf("Winning Path: [ ");
     for(int i=0; i<opt.length; i++) printf("%d ", opt.nodes[i]);
@@ -173,10 +181,12 @@ void run_part4_vcg_auction(graph *g, unsigned char *security_set) {
             double payment = alt.total_cost - cost_others;
             printf("%d\t%d\t%s\t%.2f\n", 
                    u, bids[u], security_set[u] ? "Sec" : "Unsec", payment);
+            LOG_P4_PAY(u, bids[u], payment);
             free(alt.nodes);
         }
     }
 
     free(opt.nodes);
     free(bids);
+    LOG_STEP_END();
 }

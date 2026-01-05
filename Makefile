@@ -11,8 +11,19 @@ PKG_CONFIG_ENV := PKG_CONFIG_PATH=/opt/homebrew/lib/pkgconfig
 endif
 endif
 
+
+# Optional Logging Flag
+ifeq ($(LOG),1)
+CFLAGS += -DENABLE_LOGGING
+endif
+
 CFLAGS := -Wall -Wextra -Iinclude -g -O3 $(shell $(PKG_CONFIG_ENV) pkg-config --cflags glib-2.0)
 LDFLAGS := $(shell $(PKG_CONFIG_ENV) pkg-config --libs glib-2.0)
+
+# Optional Logging Flag
+ifeq ($(LOG),1)
+CFLAGS += -DENABLE_LOGGING
+endif
 
 SRC := main.c $(wildcard src/*.c)
 OBJ_DIR := build

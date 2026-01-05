@@ -4,7 +4,9 @@
 #include <math.h>
 #include <string.h>
 #include <glib.h>
+#include <glib.h>
 #include "../include/algorithm.h"
+#include "../include/logging.h"
 
 /* ============================================================================
  * PRIVATE HELPER FUNCTIONS
@@ -79,6 +81,8 @@ uint64_t run_best_response_iteration(game_system *game)
         {
             game->strategies[i] = best_strategy;
             change_occurred = 1;
+            double chosen_u = (best_strategy == 1) ? u_in : u_out;
+            LOG_NODE_UPDATE(i, curr_strategy, best_strategy, chosen_u);
         }
     }
 
@@ -115,7 +119,11 @@ uint64_t run_regret_matching_iteration(game_system *game)
     for (uint64_t i = 0; i < nnodes; ++i)
     {
         double prob_1 = game->rs.probs[2 * i + 1];
+        uint64_t old_s = game->strategies[i];
         game->strategies[i] = (get_random_double() < prob_1) ? 1 : 0;
+        if (game->strategies[i] != old_s) {
+            LOG_NODE_UPDATE(i, old_s, game->strategies[i], 0.0);
+        }
     }
 
     uint64_t is_nash = 1;
@@ -261,7 +269,12 @@ uint64_t run_fictitious_play_iteration(game_system *game)
     // Apply strategies and update history counts
     for (uint64_t i = 0; i < n; ++i)
     {
+        int old_s = game->strategies[i];
         game->strategies[i] = next_strategies[i];
+        if (game->strategies[i] != old_s) {
+            LOG_NODE_UPDATE(i, old_s, game->strategies[i], 0.0);
+        }
+
         if (game->strategies[i] == 1)
         {
             game->fs.counts[i]++;
@@ -373,7 +386,15 @@ int64_t run_simulation(game_system *game, int algorithm, uint64_t max_it, int ve
             printf("--- It %" PRIu64 " ---\n", game->iteration + 1);
         }
 
+        const char *algo_name = "UNKNOWN";
+        if (algorithm == ALGO_BRD) algo_name = "BRD";
+        else if (algorithm == ALGO_RM) algo_name = "RM";
+        else if (algorithm == ALGO_FP) algo_name = "FP";
+
+        LOG_STEP_BEGIN(game->iteration, algo_name);
+
         int change = 0;
+
         if (algorithm == ALGO_BRD)
         {
             change = run_best_response_iteration(game);
@@ -386,6 +407,8 @@ int64_t run_simulation(game_system *game, int algorithm, uint64_t max_it, int ve
         {
             change = run_fictitious_play_iteration(game);
         }
+        
+        LOG_STEP_END();
 
         if (!change)
         {

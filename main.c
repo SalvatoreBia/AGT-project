@@ -8,6 +8,7 @@
 #include "include/data_structures.h"
 #include "include/min_cost_flow.h"
 #include "include/auction.h"
+#include "include/logging.h"
 
 #define GRAPH_FILENAME "graph_dump.bin"
 
@@ -132,6 +133,12 @@ int main(int argc, char *argv[])
 
     // Save generated graph
     save_graph_to_file(g, GRAPH_FILENAME);
+
+    // Initialize Logging
+    char log_filename[256];
+    snprintf(log_filename, sizeof(log_filename), "log_n%" PRIu64 "_k%" PRIu64 "_t%d_a%d_c%d.log", 
+             num_nodes, k_param, graph_type, algorithm, capacity_mode);
+    LOG_INIT(log_filename);
 
     clock_t start_time = clock();
 
@@ -330,6 +337,8 @@ int main(int argc, char *argv[])
     run_part4_vcg_auction(g, game.strategies);
 
     // Final Cleanup
+    // Final Cleanup
+    LOG_CLOSE();
     free_game(&game);
     free_graph(g);
 

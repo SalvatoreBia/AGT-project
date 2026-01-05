@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AGT Algorithm Visualizer</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <h1>🎮 AGT Algorithm Visualizer</h1>
+            <p class="subtitle">Visualize Strategic Games, Matching Markets & VCG Auctions</p>
+        </header>
+
+        <!-- File Upload Section -->
+        <!-- File Upload Section -->
+        <section class="upload-section glass-panel">
+            <div class="upload-area" id="dropZone">
+                <div class="upload-icon">📂</div>
+                <p>Drop your <code>.log</code> file here or click to browse</p>
+                <input type="file" id="fileInput" accept=".log" hidden>
+            </div>
+            <div class="file-info" id="fileInfo"></div>
+        </section>
+
+        <!-- Controls Section -->
+        <section class="controls-section glass-panel" id="controlsSection" style="display: none;">
+            <div class="playback-controls">
+                <select id="algoSelect" class="algo-select"
+                    style="margin-right: 15px; padding: 5px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.3); color: white;">
+                    <option value="" disabled selected>Jump to Algorithm...</option>
+                </select>
+                <div class="btn-group">
+                    <button id="btnFirst" title="First Step">⏮️</button>
+                    <button id="btnPrev" title="Previous Step">◀️</button>
+                    <button id="btnPlay" title="Play/Pause">▶️</button>
+                    <button id="btnNext" title="Next Step">▶️</button>
+                    <button id="btnLast" title="Last Step">⏭️</button>
+                </div>
+            </div>
+            <div class="progress-container">
+                <input type="range" id="progressSlider" min="0" max="100" value="0">
+                <span id="stepLabel">Step 0 / 0</span>
+            </div>
+            <div class="speed-control">
+                <label>Speed:</label>
+                <input type="range" id="speedSlider" min="50" max="2000" value="500">
+                <span id="speedLabel">500ms</span>
+            </div>
+        </section>
+
+        <!-- Main Visualization Area -->
+        <main class="visualization-area" id="vizArea" style="display: none;">
+            <!-- Algorithm Info Panel -->
+            <aside class="info-panel glass-panel">
+                <h3 id="algoName">Algorithm</h3>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <span class="stat-value" id="statIteration">0</span>
+                        <span class="stat-label">Iteration</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-value" id="statSecure">0</span>
+                        <span class="stat-label">In Security Set</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-value" id="statChanges">0</span>
+                        <span class="stat-label">Changes This Step</span>
+                    </div>
+                </div>
+                <div class="legend">
+                    <h4>Legend</h4>
+                    <div class="legend-item"><span class="dot secure"></span> Secure (Strategy 1)</div>
+                    <div class="legend-item"><span class="dot insecure"></span> Insecure (Strategy 0)</div>
+                    <div class="legend-item"><span class="dot changed"></span> Changed This Step</div>
+                </div>
+            </aside>
+
+            <!-- Graph Container -->
+            <div class="graph-container glass-panel">
+                <svg id="graphSvg"></svg>
+            </div>
+
+            <!-- Part 3/4 Specific Panels -->
+            <aside class="details-panel glass-panel" id="detailsPanel" style="display: none;">
+                <h3 id="detailsTitle">Details</h3>
+                <div id="detailsContent"></div>
+            </aside>
+        </main>
+
+        <!-- Matching Market View -->
+        <section class="matching-view glass-panel" id="matchingView" style="display: none;">
+            <h3>🛒 Matching Market</h3>
+            <div class="matching-container">
+                <div class="matching-column" id="buyersColumn">
+                    <h4>Buyers</h4>
+                </div>
+                <div class="matching-links" id="matchingLinks">
+                    <svg id="matchingSvg"></svg>
+                </div>
+                <div class="matching-column" id="vendorsColumn">
+                    <h4>Vendors</h4>
+                </div>
+            </div>
+            <div class="matching-stats" id="matchingStats"></div>
+        </section>
+
+        <!-- VCG Auction View -->
+        <section class="vcg-view glass-panel" id="vcgView" style="display: none;">
+            <h3>🔒 VCG Auction</h3>
+            <div class="vcg-info">
+                <div class="vcg-request" id="vcgRequest"></div>
+                <div class="vcg-path" id="vcgPath"></div>
+            </div>
+            <div class="vcg-payments" id="vcgPayments"></div>
+        </section>
+    </div>
+
+    <script src="visualizer.js"></script>
+</body>
+
+</html>
