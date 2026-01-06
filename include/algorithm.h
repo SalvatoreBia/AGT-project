@@ -8,14 +8,14 @@
 #define ALGO_RM  2
 #define ALGO_FP  3
 
-double calculate_utility(game_system *game, uint64_t player_id, uint64_t strategy);
+double calculate_utility(game_system *game, int player_id, int strategy);
 
-int64_t run_simulation(game_system *game, int algorithm, uint64_t max_it, int verbose);
+int run_simulation(game_system *game, int algorithm, int max_it, int verbose);
 
-uint64_t run_best_response_iteration(game_system *game);
-uint64_t run_regret_matching_iteration(game_system *game);
+int run_best_response_iteration(game_system *game);
+int run_regret_matching_iteration(game_system *game);
 
-uint64_t run_fictitious_play_iteration(game_system *game);
+int run_fictitious_play_iteration(game_system *game);
 
 int is_valid_cover(game_system *game);
 int is_minimal(game_system *game);
@@ -28,16 +28,16 @@ void free_fictitious_system(game_system *game);
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-double characteristic_function_v1(graph *g, uint64_t *coalition, size_t coalition_size);
-double characteristic_function_v2(graph *g, uint64_t *coalition, size_t coalition_size);
-double characteristic_function_v3(graph *g, uint64_t *coalition, size_t coalition_size);
+double characteristic_function_v1(graph *g, int *coalition, size_t coalition_size);
+double characteristic_function_v2(graph *g, int *coalition, size_t coalition_size);
+double characteristic_function_v3(graph *g, int *coalition, size_t coalition_size);
 
 double* calculate_shapley_values(graph *g, int iterations, int version);
 
 unsigned char* build_security_set_from_shapley(graph *g, double *shapley_values);
 
-int count_covered_edges(graph *g, uint64_t *coalition, size_t coalition_size);
-int is_coalition_valid_cover(graph *g, uint64_t *coalition, size_t coalition_size);
-int is_coalition_minimal(graph *g, uint64_t *coalition, size_t coalition_size);
+int count_covered_edges(graph *g, int *coalition, size_t coalition_size);
+int is_coalition_valid_cover(graph *g, int *coalition, size_t coalition_size);
+int is_coalition_minimal(graph *g, int *coalition, size_t coalition_size);
 
 #endif /* ALGORITHM_H */

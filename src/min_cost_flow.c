@@ -363,7 +363,7 @@ void run_part3_matching_market(graph *g, unsigned char *security_set, int limite
     // 1. Identify Buyers (Players in Security Set)
     int *buyers = malloc(g->num_nodes * sizeof(int));
     int num_buyers = 0;
-    for(uint64_t i=0; i<g->num_nodes; i++) {
+    for(int i=0; i<g->num_nodes; i++) {
         if(security_set[i]) {
             buyers[num_buyers++] = i;
         }

@@ -10,10 +10,10 @@
 
 typedef struct
 {
-    uint64_t num_nodes;
-    uint64_t num_edges;
-    uint64_t *row_ptr;
-    uint64_t *col_ind;
+    int num_nodes;
+    int num_edges;
+    int *row_ptr;
+    int *col_ind;
 } graph;
 
 typedef struct
@@ -24,9 +24,9 @@ typedef struct
 
 typedef struct
 {
-    uint64_t *counts;
+    int *counts;
     double *believes;
-    uint64_t turn;
+    int turn;
 } fictitious_system;
 
 
@@ -39,21 +39,21 @@ typedef struct
     
     fictitious_system fs;
 
-    uint64_t num_players;
-    uint64_t iteration;
+    int num_players;
+    int iteration;
 } game_system;
 
 
-graph* create_graph(uint64_t num_nodes, uint64_t num_edges);
+graph* create_graph(int num_nodes, int num_edges);
 void free_graph(graph *g);
 void print_graph(graph *g);
 
 graph* load_graph_from_file(const char *filename);
-uint64_t save_graph_to_file(graph *g, const char *filename);
+int save_graph_to_file(graph *g, const char *filename);
 
-graph* generate_random_regular(uint64_t num_nodes, uint64_t degree);
-graph* generate_erdos_renyi(uint64_t num_nodes, double p);
-graph* generate_barabasi_albert(uint64_t num_nodes, uint64_t m);
+graph* generate_random_regular(int num_nodes, int degree);
+graph* generate_erdos_renyi(int num_nodes, double p);
+graph* generate_barabasi_albert(int num_nodes, int m);
 
 void init_game(game_system *game, graph *g); 
 void free_game(game_system *game);

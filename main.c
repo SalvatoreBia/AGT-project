@@ -35,9 +35,9 @@ void print_usage(const char *prog_name)
 int main(int argc, char *argv[])
 {
     // Default values
-    uint64_t num_nodes = 10000;
-    uint64_t k_param = 4;
-    uint64_t max_it = 100000;
+    int num_nodes = 10000;
+    int k_param = 4;
+    int max_it = 100000;
     int algorithm = ALGO_FP;
     int graph_type = TYPE_REGULAR;
     int shapley_version = 3;
@@ -106,7 +106,7 @@ int main(int argc, char *argv[])
     // you might want to disable the file loading or save different files for different types.
     // For now, I will overwrite logic to prefer generation if arguments are specific.
 
-    printf("Generating graph type %d with %" PRIu64 " nodes and param %" PRIu64 "...\n", graph_type, num_nodes, k_param);
+    printf("Generating graph type %d with %d nodes and param %d...\n", graph_type, num_nodes, k_param);
 
     if (graph_type == TYPE_REGULAR)
     {
@@ -121,7 +121,7 @@ int main(int argc, char *argv[])
     }
     else if (graph_type == TYPE_BARABASI)
     {
-        printf("Barabasi-Albert: m = %" PRIu64 "\n", k_param);
+        printf("Barabasi-Albert: m = %d\n", k_param);
         g = generate_barabasi_albert(num_nodes, k_param);
     }
 
@@ -136,7 +136,7 @@ int main(int argc, char *argv[])
 
     // Initialize Logging
     char log_filename[256];
-    snprintf(log_filename, sizeof(log_filename), "log_n%" PRIu64 "_k%" PRIu64 "_t%d_a%d_c%d.log", 
+    snprintf(log_filename, sizeof(log_filename), "log_n%d_k%d_t%d_a%d_c%d.log", 
              num_nodes, k_param, graph_type, algorithm, capacity_mode);
     LOG_INIT(log_filename);
 
@@ -148,7 +148,7 @@ int main(int argc, char *argv[])
         printf("\n=== COALITIONAL GAME APPROACH ===\n");
         printf("Algorithm: Shapley Values (Monte Carlo)\n");
         printf("Characteristic function version: %d\n", shapley_version);
-        printf("Monte Carlo iterations: %" PRIu64 "\n\n", max_it);
+        printf("Monte Carlo iterations: %d\n\n", max_it);
 
         // Calcola Shapley values
         double *shapley_values = calculate_shapley_values(g, (int)max_it, shapley_version);
@@ -161,17 +161,17 @@ int main(int argc, char *argv[])
         printf("\nShapley computation finished in %.2fs\n", elapsed);
 
         // Analisi risultati
-        uint64_t active_count = 0;
-        for (uint64_t i = 0; i < g->num_nodes; ++i)
+        int active_count = 0;
+        for (int i = 0; i < g->num_nodes; ++i)
         {
             if (shapley_set[i])
                 active_count++;
         }
 
         // Crea coalizione per verifiche
-        uint64_t *coalition = malloc(active_count * sizeof(uint64_t));
+        int *coalition = malloc(active_count * sizeof(int));
         size_t idx = 0;
-        for (uint64_t i = 0; i < g->num_nodes; ++i)
+        for (int i = 0; i < g->num_nodes; ++i)
         {
             if (shapley_set[i])
             {
@@ -183,7 +183,7 @@ int main(int argc, char *argv[])
         int minimal = is_coalition_minimal(g, coalition, active_count);
 
         printf("\n=== RESULTS ===\n");
-        printf("Cover Size: %" PRIu64 " / %" PRIu64 " (%.2f%%)\n", 
+        printf("Cover Size: %d / %d (%.2f%%)\n", 
                active_count, g->num_nodes, (double)active_count / g->num_nodes * 100.0);
         printf("Valid Cover: %s\n", valid ? "YES" : "NO");
         printf("Minimal: %s\n", minimal ? "YES" : "NO");
@@ -192,21 +192,21 @@ int main(int argc, char *argv[])
         printf("\nTop 10 nodes by Shapley value:\n");
         typedef struct
         {
-            uint64_t id;
+            int id;
             double value;
         } node_shapley;
 
         node_shapley *sorted = malloc(g->num_nodes * sizeof(node_shapley));
-        for (uint64_t i = 0; i < g->num_nodes; ++i)
+        for (int i = 0; i < g->num_nodes; ++i)
         {
             sorted[i].id = i;
             sorted[i].value = shapley_values[i];
         }
 
         // Simple bubble sort per top 10
-        for (uint64_t i = 0; i < 10 && i < g->num_nodes; ++i)
+        for (int i = 0; i < 10 && i < g->num_nodes; ++i)
         {
-            for (uint64_t j = i + 1; j < g->num_nodes; ++j)
+            for (int j = i + 1; j < g->num_nodes; ++j)
             {
                 if (sorted[j].value > sorted[i].value)
                 {
@@ -217,9 +217,9 @@ int main(int argc, char *argv[])
             }
         }
 
-        for (uint64_t i = 0; i < 10 && i < g->num_nodes; ++i)
+        for (int i = 0; i < 10 && i < g->num_nodes; ++i)
         {
-            printf("  %2" PRIu64 ". Node %" PRIu64 ": %.6f %s\n", 
+            printf("  %2d. Node %d: %.6f %s\n", 
                    i + 1, sorted[i].id, sorted[i].value,
                    shapley_set[sorted[i].id] ? "(in set)" : "");
         }
@@ -280,8 +280,8 @@ int main(int argc, char *argv[])
             init_fictitious_system(&game);
         }
 
-        int64_t result = run_simulation(&game, algorithm, max_it, 1);
-        uint64_t converged = (result != -1);
+        int result = run_simulation(&game, algorithm, max_it, 1);
+        int converged = (result != -1);
 
         double elapsed = (double)(clock() - start_time) / CLOCKS_PER_SEC;
         printf("\nSimulation finished in %.2fs\n", elapsed);
@@ -300,14 +300,14 @@ int main(int argc, char *argv[])
         int valid = is_valid_cover(&game);
 
         long active_count = 0;
-        for (uint64_t i = 0; i < game.num_players; ++i)
+        for (int i = 0; i < game.num_players; ++i)
         {
             if (game.strategies[i] == 1)
                 active_count++;
         }
 
         printf("\n=== RESULTS ===\n");
-        printf("Cover Size: %ld / %" PRIu64 " (%.2f%%)\n", active_count, game.num_players, (double)active_count / game.num_players * 100.0);
+        printf("Cover Size: %ld / %d (%.2f%%)\n", active_count, game.num_players, (double)active_count / game.num_players * 100.0);
         printf("Valid Cover: %s\n", valid ? "YES" : "NO");
         printf("Minimal Local: %s\n", minimal ? "YES" : "NO");
 

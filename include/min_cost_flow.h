@@ -7,8 +7,8 @@
 
 // Structure to represent a matching result
 typedef struct {
-    uint64_t buyer_id;
-    uint64_t vendor_id;
+    int buyer_id;
+    int vendor_id;
     double utility;
 } match_t;
 

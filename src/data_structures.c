@@ -7,11 +7,11 @@
 
 // Helper struct for temporary edge storage
 typedef struct {
-    uint64_t u;
-    uint64_t v;
+    int u;
+    int v;
 } edge_t;
 
-graph *create_graph(uint64_t num_nodes, uint64_t num_edges)
+graph *create_graph(int num_nodes, int num_edges)
 {
     if (num_nodes == 0)
         return NULL;
@@ -23,8 +23,8 @@ graph *create_graph(uint64_t num_nodes, uint64_t num_edges)
     g->num_nodes = num_nodes;
     g->num_edges = num_edges;
 
-    g->row_ptr = (uint64_t *)calloc((num_nodes + 1), sizeof(uint64_t));
-    g->col_ind = (uint64_t *)malloc(num_edges * sizeof(uint64_t));
+    g->row_ptr = (int *)calloc((num_nodes + 1), sizeof(int));
+    g->col_ind = (int *)malloc(num_edges * sizeof(int));
 
     if (!g->row_ptr || !g->col_ind)
     {
@@ -50,22 +50,22 @@ void print_graph(graph *g)
 {
     if (!g)
         return;
-    printf("Graph CSR (%" PRIu64 " nodes, %" PRIu64 " edges)\n", g->num_nodes, g->num_edges);
+    printf("Graph CSR (%d nodes, %d edges)\n", g->num_nodes, g->num_edges);
 
-    uint64_t limit = g->num_nodes > 10 ? 10 : g->num_nodes;
-    for (uint64_t i = 0; i < limit; ++i)
+    int limit = g->num_nodes > 10 ? 10 : g->num_nodes;
+    for (int i = 0; i < limit; ++i)
     {
-        printf("%" PRIu64 ": ", i);
-        for (uint64_t j = g->row_ptr[i]; j < g->row_ptr[i + 1]; ++j)
+        printf("%d: ", i);
+        for (int j = g->row_ptr[i]; j < g->row_ptr[i + 1]; ++j)
         {
-            printf("%" PRIu64 " ", g->col_ind[j]);
+            printf("%d ", g->col_ind[j]);
         }
         printf("\n");
     }
 }
 
 
-uint64_t save_graph_to_file(graph *g, const char *filename)
+int save_graph_to_file(graph *g, const char *filename)
 {
     if (!g || !filename)
         return 0;
@@ -77,10 +77,10 @@ uint64_t save_graph_to_file(graph *g, const char *filename)
         return 0;
     }
 
-    fwrite(&g->num_nodes, sizeof(uint64_t), 1, f);
-    fwrite(&g->num_edges, sizeof(uint64_t), 1, f);
-    fwrite(g->row_ptr, sizeof(uint64_t), g->num_nodes + 1, f);
-    fwrite(g->col_ind, sizeof(uint64_t), g->num_edges, f);
+    fwrite(&g->num_nodes, sizeof(int), 1, f);
+    fwrite(&g->num_edges, sizeof(int), 1, f);
+    fwrite(g->row_ptr, sizeof(int), g->num_nodes + 1, f);
+    fwrite(g->col_ind, sizeof(int), g->num_edges, f);
 
     fclose(f);
     printf("Graph saved to %s\n", filename);
@@ -96,10 +96,10 @@ graph *load_graph_from_file(const char *filename)
     if (!f)
         return NULL;
 
-    uint64_t num_nodes = 0, num_edges = 0;
+    int num_nodes = 0, num_edges = 0;
 
-    if (fread(&num_nodes, sizeof(uint64_t), 1, f) != 1 ||
-        fread(&num_edges, sizeof(uint64_t), 1, f) != 1)
+    if (fread(&num_nodes, sizeof(int), 1, f) != 1 ||
+        fread(&num_edges, sizeof(int), 1, f) != 1)
     {
         fclose(f);
         return NULL;
@@ -112,8 +112,8 @@ graph *load_graph_from_file(const char *filename)
         return NULL;
     }
 
-    if (fread(g->row_ptr, sizeof(uint64_t), num_nodes + 1, f) != num_nodes + 1 ||
-        fread(g->col_ind, sizeof(uint64_t), num_edges, f) != num_edges)
+    if (fread(g->row_ptr, sizeof(int), num_nodes + 1, f) != num_nodes + 1 ||
+        fread(g->col_ind, sizeof(int), num_edges, f) != num_edges)
     {
         free_graph(g);
         fclose(f);
@@ -121,26 +121,26 @@ graph *load_graph_from_file(const char *filename)
     }
 
     fclose(f);
-    printf("Graph loaded from %s (%" PRIu64 " nodes, %" PRIu64 " edges)\n", filename, num_nodes, num_edges);
+    printf("Graph loaded from %s (%d nodes, %d edges)\n", filename, num_nodes, num_edges);
     return g;
 }
 
 
-static void shuffle_array(uint64_t *array, uint64_t n)
+static void shuffle_array(int *array, int n)
 {
-    for (uint64_t i = n - 1; i > 0; i--)
+    for (int i = n - 1; i > 0; i--)
     {
-        uint64_t j = rand() % (i + 1);
-        uint64_t temp = array[i];
+        int j = rand() % (i + 1);
+        int temp = array[i];
         array[i] = array[j];
         array[j] = temp;
     }
 }
 
-static uint64_t has_edge_partial(graph *g, uint64_t u, uint64_t v, uint64_t current_u_degree)
+static int has_edge_partial(graph *g, int u, int v, int current_u_degree)
 {
-    uint64_t start = g->row_ptr[u];
-    for (uint64_t i = 0; i < current_u_degree; ++i)
+    int start = g->row_ptr[u];
+    for (int i = 0; i < current_u_degree; ++i)
     {
         if (g->col_ind[start + i] == v)
             return 1;
@@ -148,16 +148,16 @@ static uint64_t has_edge_partial(graph *g, uint64_t u, uint64_t v, uint64_t curr
     return 0;
 }
 
-graph *generate_random_regular(uint64_t num_nodes, uint64_t degree)
+graph *generate_random_regular(int num_nodes, int degree)
 {
     if ((num_nodes * degree) % 2 != 0 || degree >= num_nodes)
         return NULL;
 
-    uint64_t num_edges = num_nodes * degree;
-    uint64_t total_stubs = num_nodes * degree;
+    int num_edges = num_nodes * degree;
+    int total_stubs = num_nodes * degree;
 
-    uint64_t *stubs = (uint64_t *)malloc(total_stubs * sizeof(uint64_t));
-    uint64_t *current_degree = (uint64_t *)calloc(num_nodes, sizeof(uint64_t));
+    int *stubs = (int *)malloc(total_stubs * sizeof(int));
+    int *current_degree = (int *)calloc(num_nodes, sizeof(int));
 
     if (!stubs || !current_degree)
     {
@@ -167,7 +167,7 @@ graph *generate_random_regular(uint64_t num_nodes, uint64_t degree)
     }
 
     graph *g = NULL;
-    uint64_t success = 0;
+    int success = 0;
 
     while (!success)
     {
@@ -177,25 +177,25 @@ graph *generate_random_regular(uint64_t num_nodes, uint64_t degree)
         if (!g)
             break;
 
-        for (uint64_t i = 0; i <= num_nodes; ++i)
+        for (int i = 0; i <= num_nodes; ++i)
             g->row_ptr[i] = i * degree;
 
-        memset(current_degree, 0, num_nodes * sizeof(uint64_t));
+        memset(current_degree, 0, num_nodes * sizeof(int));
 
-        uint64_t k = 0;
-        for (uint64_t i = 0; i < num_nodes; ++i)
+        int k = 0;
+        for (int i = 0; i < num_nodes; ++i)
         {
-            for (uint64_t j = 0; j < degree; ++j)
+            for (int j = 0; j < degree; ++j)
                 stubs[k++] = i;
         }
 
         shuffle_array(stubs, total_stubs);
 
-        uint64_t collision = 0;
-        for (uint64_t i = 0; i < total_stubs; i += 2)
+        int collision = 0;
+        for (int i = 0; i < total_stubs; i += 2)
         {
-            uint64_t u = stubs[i];
-            uint64_t v = stubs[i + 1];
+            int u = stubs[i];
+            int v = stubs[i + 1];
 
             if (u == v || has_edge_partial(g, u, v, current_degree[u]))
             {
@@ -219,7 +219,7 @@ graph *generate_random_regular(uint64_t num_nodes, uint64_t degree)
 // ---------------------------------------------------------
 // NEW: Erdos-Renyi Generator
 // ---------------------------------------------------------
-graph *generate_erdos_renyi(uint64_t num_nodes, double p) {
+graph *generate_erdos_renyi(int num_nodes, double p) {
     // Estimating number of edges for allocation (could overflow if p is large, using dynamic array is safer)
     // To keep it simple in C, we'll use a dynamic growing array of edges.
     
@@ -228,12 +228,12 @@ graph *generate_erdos_renyi(uint64_t num_nodes, double p) {
     edge_t *edge_list = (edge_t *)malloc(capacity * sizeof(edge_t));
     if(!edge_list) return NULL;
 
-    uint64_t *degrees = (uint64_t *)calloc(num_nodes, sizeof(uint64_t));
+    int *degrees = (int *)calloc(num_nodes, sizeof(int));
     if(!degrees) { free(edge_list); return NULL; }
 
     // Generate Edges
-    for (uint64_t i = 0; i < num_nodes; ++i) {
-        for (uint64_t j = i + 1; j < num_nodes; ++j) {
+    for (int i = 0; i < num_nodes; ++i) {
+        for (int j = i + 1; j < num_nodes; ++j) {
             double r = (double)rand() / (double)RAND_MAX;
             if (r < p) {
                 // Add edge
@@ -267,20 +267,20 @@ graph *generate_erdos_renyi(uint64_t num_nodes, double p) {
 
     // Fill row_ptr (prefix sum)
     g->row_ptr[0] = 0;
-    for (uint64_t i = 0; i < num_nodes; ++i) {
+    for (int i = 0; i < num_nodes; ++i) {
         g->row_ptr[i+1] = g->row_ptr[i] + degrees[i];
     }
 
     // Temporary array to track insertion position for each node
-    uint64_t *current_pos = (uint64_t *)malloc(num_nodes * sizeof(uint64_t));
-    for (uint64_t i = 0; i < num_nodes; ++i) {
+    int *current_pos = (int *)malloc(num_nodes * sizeof(int));
+    for (int i = 0; i < num_nodes; ++i) {
         current_pos[i] = g->row_ptr[i];
     }
 
     // Fill col_ind
     for (size_t i = 0; i < count; ++i) {
-        uint64_t u = edge_list[i].u;
-        uint64_t v = edge_list[i].v;
+        int u = edge_list[i].u;
+        int v = edge_list[i].v;
 
         g->col_ind[current_pos[u]++] = v;
         g->col_ind[current_pos[v]++] = u;
@@ -296,28 +296,28 @@ graph *generate_erdos_renyi(uint64_t num_nodes, double p) {
 // ---------------------------------------------------------
 // NEW: Barabasi-Albert Generator
 // ---------------------------------------------------------
-graph *generate_barabasi_albert(uint64_t num_nodes, uint64_t m) {
+graph *generate_barabasi_albert(int num_nodes, int m) {
     if (m < 1 || m >= num_nodes) return NULL;
 
     // We start with m+1 nodes fully connected (clique) to ensure we have a valid start
     // Number of edges in initial clique: (m+1)*m / 2
     // Number of edges added by remaining nodes: (num_nodes - (m+1)) * m
     
-    uint64_t init_nodes = m + 1;
-    uint64_t approx_edges = (init_nodes * m) / 2 + (num_nodes - init_nodes) * m;
+    int init_nodes = m + 1;
+    int approx_edges = (init_nodes * m) / 2 + (num_nodes - init_nodes) * m;
     
     // Allocate space for edges
     edge_t *edge_list = (edge_t *)malloc(approx_edges * sizeof(edge_t));
-    uint64_t edge_count = 0;
+    int edge_count = 0;
 
     // Repeated nodes array for preferential attachment (stores node ID proportional to degree)
     // Size approx 2 * num_edges
-    uint64_t *repeated_nodes = (uint64_t *)malloc(approx_edges * 2 * sizeof(uint64_t));
-    uint64_t repeated_count = 0;
+    int *repeated_nodes = (int *)malloc(approx_edges * 2 * sizeof(int));
+    int repeated_count = 0;
 
     // 1. Initialize with a clique of size m+1
-    for (uint64_t i = 0; i < init_nodes; ++i) {
-        for (uint64_t j = i + 1; j < init_nodes; ++j) {
+    for (int i = 0; i < init_nodes; ++i) {
+        for (int j = i + 1; j < init_nodes; ++j) {
             edge_list[edge_count].u = i;
             edge_list[edge_count].v = j;
             edge_count++;
@@ -328,18 +328,18 @@ graph *generate_barabasi_albert(uint64_t num_nodes, uint64_t m) {
     }
 
     // 2. Add remaining nodes
-    uint64_t *targets = (uint64_t *)malloc(m * sizeof(uint64_t));
+    int *targets = (int *)malloc(m * sizeof(int));
 
-    for (uint64_t i = init_nodes; i < num_nodes; ++i) {
+    for (int i = init_nodes; i < num_nodes; ++i) {
         // Select m distinct nodes from repeated_nodes
-        uint64_t added = 0;
+        int added = 0;
         while (added < m) {
-            uint64_t r_idx = rand() % repeated_count;
-            uint64_t target = repeated_nodes[r_idx];
+            int r_idx = rand() % repeated_count;
+            int target = repeated_nodes[r_idx];
             
             // Check for duplicates
             int duplicate = 0;
-            for (uint64_t k = 0; k < added; ++k) {
+            for (int k = 0; k < added; ++k) {
                 if (targets[k] == target) {
                     duplicate = 1;
                     break;
@@ -351,8 +351,8 @@ graph *generate_barabasi_albert(uint64_t num_nodes, uint64_t m) {
         }
 
         // Add edges connecting new node i to targets
-        for (uint64_t k = 0; k < m; ++k) {
-            uint64_t target = targets[k];
+        for (int k = 0; k < m; ++k) {
+            int target = targets[k];
             edge_list[edge_count].u = i;
             edge_list[edge_count].v = target;
             edge_count++;
@@ -366,8 +366,8 @@ graph *generate_barabasi_albert(uint64_t num_nodes, uint64_t m) {
     free(repeated_nodes);
 
     // 3. Convert to CSR (Calculate degrees, alloc, fill)
-    uint64_t *degrees = (uint64_t *)calloc(num_nodes, sizeof(uint64_t));
-    for (uint64_t i = 0; i < edge_count; ++i) {
+    int *degrees = (int *)calloc(num_nodes, sizeof(int));
+    for (int i = 0; i < edge_count; ++i) {
         degrees[edge_list[i].u]++;
         degrees[edge_list[i].v]++;
     }
@@ -376,19 +376,19 @@ graph *generate_barabasi_albert(uint64_t num_nodes, uint64_t m) {
     
     // Row pointers
     g->row_ptr[0] = 0;
-    for (uint64_t i = 0; i < num_nodes; ++i) {
+    for (int i = 0; i < num_nodes; ++i) {
         g->row_ptr[i+1] = g->row_ptr[i] + degrees[i];
     }
 
     // Fill col_ind
-    uint64_t *current_pos = (uint64_t *)malloc(num_nodes * sizeof(uint64_t));
-    for (uint64_t i = 0; i < num_nodes; ++i) {
+    int *current_pos = (int *)malloc(num_nodes * sizeof(int));
+    for (int i = 0; i < num_nodes; ++i) {
         current_pos[i] = g->row_ptr[i];
     }
 
-    for (uint64_t i = 0; i < edge_count; ++i) {
-        uint64_t u = edge_list[i].u;
-        uint64_t v = edge_list[i].v;
+    for (int i = 0; i < edge_count; ++i) {
+        int u = edge_list[i].u;
+        int v = edge_list[i].v;
 
         g->col_ind[current_pos[u]++] = v;
         g->col_ind[current_pos[v]++] = u;
@@ -412,7 +412,7 @@ void init_game(game_system *game, graph *g)
     game->rs.regrets = NULL;
     game->rs.probs = NULL;
 
-    for (uint64_t i = 0; i < game->num_players; ++i)
+    for (int i = 0; i < game->num_players; ++i)
     {
         game->strategies[i] = rand() % 2;
     }

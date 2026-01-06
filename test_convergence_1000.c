@@ -12,9 +12,9 @@ int main(int argc, char *argv[]) {
         total_runs = atoi(argv[1]);
     }
     int success_count = 0;
-    uint64_t total_iterations = 0;
-    uint64_t min_iterations = UINT64_MAX;
-    uint64_t max_iterations = 0;
+    int total_iterations = 0;
+    int min_iterations = UINT64_MAX;
+    int max_iterations = 0;
     
     printf("Starting batch test 1000 runs...\n");
     
@@ -32,7 +32,7 @@ int main(int argc, char *argv[]) {
         
         // Run verification with 2M iteration cap
         // The algorithm now has Random Restarts every 10k iterations if stuck
-        int64_t result = run_simulation(&game, ALGO_FP, 2000000, 0);
+        int result = run_simulation(&game, ALGO_FP, 2000000, 0);
         
         int converged = (result != -1);
         int minimal = 0;
@@ -45,12 +45,12 @@ int main(int argc, char *argv[]) {
         
         if (converged && minimal && valid) {
             success_count++;
-            uint64_t iters = game.iteration;
+            int iters = game.iteration;
             total_iterations += iters;
             if (iters < min_iterations) min_iterations = iters;
             if (iters > max_iterations) max_iterations = iters;
         } else {
-            printf("Run %d FAILED. Converged: %d, Valid: %d, Minimal: %d, Iters: %" PRIu64 "\n", 
+            printf("Run %d FAILED. Converged: %d, Valid: %d, Minimal: %d, Iters: %d\n", 
                    i, converged, valid, minimal, game.iteration);
         }
 
@@ -70,8 +70,8 @@ int main(int argc, char *argv[]) {
     printf("Successes: %d (%.2f%%)\n", success_count, (double)success_count/total_runs * 100.0);
     if (success_count > 0) {
         printf("Iterations Stats (Successes only):\n");
-        printf("  Min: %" PRIu64 "\n", min_iterations);
-        printf("  Max: %" PRIu64 "\n", max_iterations);
+        printf("  Min: %d\n", min_iterations);
+        printf("  Max: %d\n", max_iterations);
         printf("  Avg: %.2f\n", (double)total_iterations / success_count);
     }
     
