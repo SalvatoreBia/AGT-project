@@ -12,6 +12,7 @@
 double calculate_utility(game_system *game, int player_id, int strategy);
 
 int run_simulation(game_system *game, int algorithm, int max_it, int verbose);
+int run_simulation_with_restart(game_system *game, int algorithm, int max_it, int verbose, int restart_interval);
 
 int run_best_response_iteration(game_system *game);
 int run_regret_matching_iteration(game_system *game);

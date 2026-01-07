@@ -343,17 +343,17 @@ int is_minimal(game_system *game)
 
 
 
-int run_simulation(game_system *game, int algorithm, int max_it, int verbose)
+int run_simulation_with_restart(game_system *game, int algorithm, int max_it, int verbose, int restart_interval)
 {
     int converged = 0;
     int no_change_streak = 0;
     int last_restart_it = 0;
-    const int restart_interval = 1000;
 
     while (game->iteration < max_it)
     {
 
         if ((algorithm == ALGO_FP || algorithm == ALGO_FP_ASYNC) &&
+            restart_interval > 0 &&
             (game->iteration - last_restart_it) >= restart_interval)
         {
             if (verbose)
@@ -421,4 +421,9 @@ int run_simulation(game_system *game, int algorithm, int max_it, int verbose)
     }
 
     return converged ? (int)game->iteration : -1;
+}
+
+int run_simulation(game_system *game, int algorithm, int max_it, int verbose)
+{
+    return run_simulation_with_restart(game, algorithm, max_it, verbose, 1000);
 }
