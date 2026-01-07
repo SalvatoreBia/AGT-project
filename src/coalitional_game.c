@@ -76,30 +76,6 @@ static int add_node_edges_to_set(graph *g, int node, GHashTable *edges)
 
 static __thread GHashTable *g_edge_cache = NULL;
 
-/*
-int count_covered_edges(graph *g, int *coalition, size_t coalition_size)
-{
-    if (g_edge_cache == NULL)
-    {
-        g_edge_cache = g_hash_table_new_full(edge_hash, edge_equal, g_free, NULL);
-    }
-    else
-    {
-        g_hash_table_remove_all(g_edge_cache);
-    }
-
-    if (g_edge_cache == NULL)
-        return -1;
-
-    for (size_t i = 0; i < coalition_size; ++i)
-    {
-        add_node_edges_to_set(g, coalition[i], g_edge_cache);
-    }
-
-    int size = (int)g_hash_table_size(g_edge_cache);
-    return size;
-}
-*/
 
 int is_coalition_valid_cover(graph *g, int *coalition, size_t coalition_size)
 {
@@ -189,7 +165,6 @@ int is_coalition_minimal(graph *g, int *coalition, size_t coalition_size)
 
 double *calculate_shapley_values(graph *g, int iterations, int version)
 {
-    // STA ZITTO GCC
     (void)version;
 
     size_t n = g->num_nodes;
