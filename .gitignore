@@ -3,3 +3,4 @@ build/*
 graph_dump.bin
 log_*.log
 .DS_Store
+graph.txt

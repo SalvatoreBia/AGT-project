@@ -10,7 +10,7 @@
 #include "include/auction.h"
 #include "include/logging.h"
 
-#define GRAPH_FILENAME "graph_dump.bin"
+#define GRAPH_FILENAME "graph.txt"
 
 #define TYPE_REGULAR 0
 #define TYPE_ERDOS 1
@@ -26,9 +26,10 @@ void print_usage(const char *prog_name)
     printf("  -k <val>         Degree/Param (Reg: degree, ER: avg degree, BA: m) (default: 4)\n");
     printf("  -t <type>        Graph Type (0=Regular, 1=Erdos, 2=Barabasi) (default: 0)\n");
     printf("  -i <iterations>  Maximum number of iterations (default: 10000)\n");
-    printf("  -a <algorithm>   Algorithm to use (1=BRD, 2=RM, 3=FP, 4=Shapley) (default: 3)\n");
+    printf("  -a <algorithm>   Algorithm to use (1=BRD, 2=RM, 3=FP, 4=Shapley, 5=FP_Async) (default: 3)\n");
     printf("  -v <version>     Characteristic function version for Shapley (1, 2, or 3) (default: 3)\n");
     printf("  -c <capacity>    Capacity Mode (0=Infinite, 1=Limited, 2=Both) (default: 0)\n");
+    printf("  -f <file>        Load graph from file instead of generating one\n");
     printf("  -h               Show this help message\n");
 }
 
@@ -42,9 +43,10 @@ int main(int argc, char *argv[])
     int graph_type = TYPE_REGULAR;
     int shapley_version = 3;
     int capacity_mode = 0;
+    char *input_file = NULL;
 
     int opt;
-    while ((opt = getopt(argc, argv, "n:k:i:a:t:v:c:h")) != -1)
+    while ((opt = getopt(argc, argv, "n:k:i:a:t:v:c:f:h")) != -1)
     {
         switch (opt)
         {
@@ -67,9 +69,9 @@ int main(int argc, char *argv[])
             break;
         case 'a':
             algorithm = atoi(optarg);
-            if (algorithm < ALGO_BRD || algorithm > ALGO_SHAPLEY)
+            if ((algorithm < ALGO_BRD || algorithm > ALGO_SHAPLEY) && algorithm != ALGO_FP_ASYNC)
             {
-                fprintf(stderr, "Invalid algorithm selection. Use 1, 2, 3, or 4.\n");
+                fprintf(stderr, "Invalid algorithm selection. Use 1, 2, 3, 4, or 5.\n");
                 return 1;
             }
             break;
@@ -89,6 +91,9 @@ int main(int argc, char *argv[])
                 return 1;
             }
             break;
+        case 'f':
+            input_file = optarg;
+            break;
         case 'h':
             print_usage(argv[0]);
             return 0;
@@ -103,34 +108,45 @@ int main(int argc, char *argv[])
     srand((unsigned int)time(NULL));
 
 
-
-    printf("[INFO] Generating graph type %d with %d nodes and param %d...\n", graph_type, num_nodes, k_param);
-
-    if (graph_type == TYPE_REGULAR)
+    if (input_file != NULL)
     {
-        g = generate_random_regular(num_nodes, k_param);
+        printf("[INFO] Loading graph from file: %s\n", input_file);
+        g = load_graph_from_text(input_file);
+        if (!g)
+        {
+            fprintf(stderr, "Error: Failed to load graph from file '%s'.\n", input_file);
+            return 1;
+        }
+        printf("[INFO] Loaded graph with %d nodes\n", g->num_nodes);
     }
-    else if (graph_type == TYPE_ERDOS)
+    else
     {
+        printf("[INFO] Generating graph type %d with %d nodes and param %d...\n", graph_type, num_nodes, k_param);
 
-        double p = (double)k_param / (double)(num_nodes - 1);
-        printf("[INFO] Erdos-Renyi: calculated p = %lf\n", p);
-        g = generate_erdos_renyi(num_nodes, p);
+        if (graph_type == TYPE_REGULAR)
+        {
+            g = generate_random_regular(num_nodes, k_param);
+        }
+        else if (graph_type == TYPE_ERDOS)
+        {
+            double p = (double)k_param / (double)(num_nodes - 1);
+            printf("[INFO] Erdos-Renyi: calculated p = %lf\n", p);
+            g = generate_erdos_renyi(num_nodes, p);
+        }
+        else if (graph_type == TYPE_BARABASI)
+        {
+            printf("[INFO] Barabasi-Albert: m = %d\n", k_param);
+            g = generate_barabasi_albert(num_nodes, k_param);
+        }
+
+        if (!g)
+        {
+            fprintf(stderr, "Error: Failed to generate graph.\n");
+            return 1;
+        }
+
+        save_graph_to_text(g, GRAPH_FILENAME);
     }
-    else if (graph_type == TYPE_BARABASI)
-    {
-        printf("[INFO] Barabasi-Albert: m = %d\n", k_param);
-        g = generate_barabasi_albert(num_nodes, k_param);
-    }
-
-    if (!g)
-    {
-        fprintf(stderr, "Error: Failed to generate graph.\n");
-        return 1;
-    }
-
-
-    save_graph_to_file(g, GRAPH_FILENAME);
 
 
     char log_filename[256];
@@ -253,6 +269,11 @@ int main(int argc, char *argv[])
             printf("Algorithm: Fictitious Play (FP)\n");
             init_fictitious_system(&game);
         }
+        else if (algorithm == ALGO_FP_ASYNC)
+        {
+            printf("Algorithm: Async Fictitious Play (FP_Async)\n");
+            init_fictitious_system(&game);
+        }
 
         int result = run_simulation(&game, algorithm, max_it, 1);
         int converged = (result != -1);
@@ -289,7 +310,7 @@ int main(int argc, char *argv[])
         {
             free_regret_system(&game);
         }
-        else if (algorithm == ALGO_FP)
+        else if (algorithm == ALGO_FP || algorithm == ALGO_FP_ASYNC)
         {
             free_fictitious_system(&game);
         }

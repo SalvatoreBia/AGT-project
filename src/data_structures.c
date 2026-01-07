@@ -125,6 +125,118 @@ graph *load_graph_from_file(const char *filename)
     return g;
 }
 
+int save_graph_to_text(graph *g, const char *filename)
+{
+    if (!g || !filename)
+        return 0;
+
+    FILE *f = fopen(filename, "w");
+    if (!f)
+    {
+        perror("Error opening file for writing");
+        return 0;
+    }
+
+    int unique_edges = g->num_edges / 2;
+    fprintf(f, "%d %d\n", g->num_nodes, unique_edges);
+
+    for (int u = 0; u < g->num_nodes; ++u)
+    {
+        for (int j = g->row_ptr[u]; j < g->row_ptr[u + 1]; ++j)
+        {
+            int v = g->col_ind[j];
+            if (u < v)
+            {
+                fprintf(f, "%d %d\n", u, v);
+            }
+        }
+    }
+
+    fclose(f);
+    printf("[OK] Graph saved to %s (text format)\n", filename);
+    return 1;
+}
+
+graph *load_graph_from_text(const char *filename)
+{
+    if (!filename)
+        return NULL;
+
+    FILE *f = fopen(filename, "r");
+    if (!f)
+        return NULL;
+
+    int num_nodes = 0, num_unique_edges = 0;
+    if (fscanf(f, "%d %d", &num_nodes, &num_unique_edges) != 2)
+    {
+        fclose(f);
+        return NULL;
+    }
+
+    int *degrees = (int *)calloc(num_nodes, sizeof(int));
+    edge_t *edges = (edge_t *)malloc(num_unique_edges * sizeof(edge_t));
+    if (!degrees || !edges)
+    {
+        free(degrees);
+        free(edges);
+        fclose(f);
+        return NULL;
+    }
+
+    for (int i = 0; i < num_unique_edges; ++i)
+    {
+        int u, v;
+        if (fscanf(f, "%d %d", &u, &v) != 2)
+        {
+            free(degrees);
+            free(edges);
+            fclose(f);
+            return NULL;
+        }
+        edges[i].u = u;
+        edges[i].v = v;
+        degrees[u]++;
+        degrees[v]++;
+    }
+    fclose(f);
+
+    int total_edges = num_unique_edges * 2;
+    graph *g = create_graph(num_nodes, total_edges);
+    if (!g)
+    {
+        free(degrees);
+        free(edges);
+        return NULL;
+    }
+
+    g->row_ptr[0] = 0;
+    for (int i = 0; i < num_nodes; ++i)
+    {
+        g->row_ptr[i + 1] = g->row_ptr[i] + degrees[i];
+    }
+
+    int *current_pos = (int *)malloc(num_nodes * sizeof(int));
+    for (int i = 0; i < num_nodes; ++i)
+    {
+        current_pos[i] = g->row_ptr[i];
+    }
+
+    for (int i = 0; i < num_unique_edges; ++i)
+    {
+        int u = edges[i].u;
+        int v = edges[i].v;
+        g->col_ind[current_pos[u]++] = v;
+        g->col_ind[current_pos[v]++] = u;
+    }
+
+    free(current_pos);
+    free(degrees);
+    free(edges);
+
+    printf("[OK] Graph loaded from %s (%d nodes, %d edges)\n", filename, num_nodes, total_edges);
+    return g;
+}
+
 
 static void shuffle_array(int *array, int n)
 {

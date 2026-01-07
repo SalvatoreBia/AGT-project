@@ -198,8 +198,6 @@ int run_fictitious_play_iteration(game_system *game)
             eu_0 -= PENALTY_UNSECURED * prob_neighbor_0;
         }
 
-
-
         if (eu_1 > eu_0)
         {
             next_strategies[i] = 1;
@@ -231,6 +229,48 @@ int run_fictitious_play_iteration(game_system *game)
     game->fs.turn++;
 
     free(next_strategies);
+    return change_occurred;
+}
+
+int run_async_fictitious_play_iteration(game_system *game)
+{
+    int n = game->num_players;
+
+    int change_occurred = 0;
+
+    for (int i = 0; i < n; i++)
+    {
+        int old_strategy = game->strategies[i];
+
+        double expected_utility_0 = 0.0;
+        int start = game->g->row_ptr[i];
+        int end = game->g->row_ptr[i + 1];
+
+        for (int m = start; m < end; ++m)
+        {
+            int neighbor_id = game->g->col_ind[m];
+            double prob_neighbor_0 = 1.0 - game->fs.believes[neighbor_id];
+            expected_utility_0 += prob_neighbor_0 * (-PENALTY_UNSECURED);
+        }
+
+        double expected_utility_1 = -COST_SECURITY;
+
+        game->strategies[i] = (expected_utility_0 >= expected_utility_1) ? 0 : 1;
+
+        if (game->strategies[i] != old_strategy)
+        {
+            change_occurred = 1;
+            LOG_NODE_UPDATE(i, old_strategy, game->strategies[i], 0.0);
+        }
+
+        game->fs.believes[i] = (game->fs.believes[i] * game->fs.turn + (game->strategies[i] == 1 ? 1.0 : 0.0)) / (game->fs.turn + 1);
+        if (game->strategies[i] == 1)
+        {
+            game->fs.counts[i]++;
+        }
+    }
+
+    game->fs.turn++;
     return change_occurred;
 }
 
@@ -313,7 +353,7 @@ int run_simulation(game_system *game, int algorithm, int max_it, int verbose)
     while (game->iteration < max_it)
     {
 
-        if (algorithm == ALGO_FP &&
+        if ((algorithm == ALGO_FP || algorithm == ALGO_FP_ASYNC) &&
             (game->iteration - last_restart_it) >= restart_interval)
         {
             if (verbose)
@@ -332,6 +372,7 @@ int run_simulation(game_system *game, int algorithm, int max_it, int verbose)
         if (algorithm == ALGO_BRD) algo_name = "BRD";
         else if (algorithm == ALGO_RM) algo_name = "RM";
         else if (algorithm == ALGO_FP) algo_name = "FP";
+        else if (algorithm == ALGO_FP_ASYNC) algo_name = "FP_ASYNC";
         (void)algo_name;
 
 
@@ -350,6 +391,10 @@ int run_simulation(game_system *game, int algorithm, int max_it, int verbose)
         else if (algorithm == ALGO_FP)
         {
             change = run_fictitious_play_iteration(game);
+        }
+        else if (algorithm == ALGO_FP_ASYNC)
+        {
+            change = run_async_fictitious_play_iteration(game);
         }
 
         LOG_STEP_END();

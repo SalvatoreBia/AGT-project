@@ -74,6 +74,7 @@ The compiled binary will be located at `build/main`.
 | `-a <algorithm>` | Algorithm selection (see below) | 3 |
 | `-v <version>` | Shapley characteristic function version (1-3) | 3 |
 | `-c <capacity>` | Capacity mode for matching market | 0 |
+| `-f <file>` | Load graph from a text file instead of generating one | - |
 | `-h` | Show help message | - |
 
 ### Graph Types (`-t`)
@@ -92,6 +93,7 @@ The compiled binary will be located at `build/main`.
 | 2 | Regret Matching (RM) |
 | 3 | Fictitious Play (FP) |
 | 4 | Shapley Values (Monte Carlo) |
+| 5 | Async Fictitious Play (FP_Async) |
 
 ### Capacity Modes (`-c`)
 
@@ -101,11 +103,42 @@ The compiled binary will be located at `build/main`.
 | 1 | Limited capacity |
 | 2 | Both modes |
 
+### Graph File Format
+
+When using `-f` to load a graph from file, the expected format is a simple **edge list** text file:
+
+```
+<num_nodes> <num_edges>
+<source_1> <target_1>
+<source_2> <target_2>
+...
+```
+
+- First line: number of nodes and number of unique (undirected) edges
+- Subsequent lines: one edge per line as two space-separated node indices (0-indexed)
+- Edges are undirected; list each edge only once
+
+Example (5 nodes, 6 edges):
+```
+5 6
+0 1
+0 2
+1 2
+1 3
+2 4
+3 4
+```
+
+When generating a graph (without `-f`), the program automatically saves it to `graph.txt`.
+
 ## Examples
 
 ```bash
 # Run Fictitious Play on a 1000-node regular graph with degree 6
 ./build/main -n 1000 -k 6 -t 0 -a 3
+
+# Run Async Fictitious Play on an Erdős-Rényi graph
+./build/main -n 500 -k 8 -t 1 -a 5
 
 # Run Shapley values on an Erdős-Rényi graph
 ./build/main -n 500 -k 8 -t 1 -a 4 -v 3 -i 5000
@@ -115,6 +148,9 @@ The compiled binary will be located at `build/main`.
 
 # Run all capacity modes (infinite + limited)
 ./build/main -n 1000 -a 3 -c 2
+
+# Load a pre-existing graph from file
+./build/main -f graph.txt -a 5
 ```
 
 Logs are saved to `log_n<nodes>_k<param>_t<type>_a<algo>_c<cap>.log`.

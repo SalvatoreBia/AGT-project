@@ -7,6 +7,7 @@
 #define ALGO_BRD 1
 #define ALGO_RM  2
 #define ALGO_FP  3
+#define ALGO_FP_ASYNC 5
 
 double calculate_utility(game_system *game, int player_id, int strategy);
 
@@ -16,6 +17,7 @@ int run_best_response_iteration(game_system *game);
 int run_regret_matching_iteration(game_system *game);
 
 int run_fictitious_play_iteration(game_system *game);
+int run_async_fictitious_play_iteration(game_system *game);
 
 int is_valid_cover(game_system *game);
 int is_minimal(game_system *game);

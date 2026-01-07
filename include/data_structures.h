@@ -76,6 +76,8 @@ void print_graph(graph *g);
 
 graph* load_graph_from_file(const char *filename);
 int save_graph_to_file(graph *g, const char *filename);
+graph* load_graph_from_text(const char *filename);
+int save_graph_to_text(graph *g, const char *filename);
 
 graph* generate_random_regular(int num_nodes, int degree);
 graph* generate_erdos_renyi(int num_nodes, double p);
