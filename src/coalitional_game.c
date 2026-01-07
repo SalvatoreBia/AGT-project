@@ -165,6 +165,7 @@ int is_coalition_minimal(graph *g, int *coalition, size_t coalition_size)
 
 double *calculate_shapley_values(graph *g, int iterations, int version)
 {
+    // STA ZITTO GCC
     (void)version;
 
     size_t n = g->num_nodes;
