@@ -218,7 +218,9 @@ int run_fictitious_play_iteration(game_system *game)
     // Update beliefs based on accumulated history
     for (int i = 0; i < n; ++i)
     {
-        // counts[i] stores how many times player i played Strategy 1 (Security)
+        // counts[i] ci dice quante volte il giocatore i ha messo la security
+        // (cioé ha scelto la strategia 1).
+        // le credenze sono questo valore normalizzato al numero di turni
         game->fs.believes[i] = (double)game->fs.counts[i] / (double)game->fs.turn;
     }
 
@@ -595,7 +597,6 @@ int is_coalition_minimal(graph *g, int *coalition, size_t coalition_size)
     return minimal;
 }
 
-
 /**
  * funzione caratteristica 1:
  *      per tutti i nodi nella coalizione, conta il numero di archi
@@ -686,7 +687,6 @@ double characteristic_function_v3(graph *g, int *coalition, size_t coalition_siz
     return value;
 }
 
-
 double *calculate_shapley_values(graph *g, int iterations, int version)
 {
     size_t n = g->num_nodes;
@@ -697,55 +697,70 @@ double *calculate_shapley_values(graph *g, int iterations, int version)
     // array che contiene una permutazione dei nodi
     int *permutation = malloc(n * sizeof(int));
 
-    // array di flag dei visitati
-    unsigned char *visited = malloc(n * sizeof(unsigned char));
+    // coalizione corrente S (nodi già aggiunti nella permutazione)
+    int *coalition = malloc(n * sizeof(int));
 
     for (size_t i = 0; i < n; i++)
     {
         permutation[i] = i;
     }
 
-    printf("Inizio calcolo Shapley OTTIMIZZATO (%d iterazioni)...\n", iterations);
+    // Puntatore alla funzione caratteristica da usare
+    double (*char_func)(graph *, int *, size_t) = NULL;
 
-    double size_penalty = 0.0;
-    if (version == 3)
-        size_penalty = 0.5;
+    if (version == 1)
+        char_func = characteristic_function_v1;
+    else if (version == 2)
+        char_func = characteristic_function_v2;
+    else if (version == 3)
+        char_func = characteristic_function_v3;
+    else
+    {
+        fprintf(stderr, "Errore: versione funzione caratteristica non valida (%d)\n", version);
+        free(shapley_values);
+        free(permutation);
+        free(coalition);
+        return NULL;
+    }
 
-    // MONTE-CARLO
+    printf("Inizio calcolo Shapley usando characteristic_function_v%d (%d iterazioni)...\n", version, iterations);
+
+
+    // MONTE-CARLO: calcolo Shapley values tramite permutazioni casuali
     for (int iter = 0; iter < iterations; ++iter)
     {
-        // genero permutazione dei nodi e inizializzo
-        // i flag per i visitati
+        // Genero permutazione casuale dei nodi
         shuffle_array(permutation, n);
-        memset(visited, 0, n * sizeof(unsigned char));
 
+        // Per ogni posizione nella permutazione
         for (size_t i = 0; i < n; ++i)
         {
             int curr_node = permutation[i];
-            visited[curr_node] = 1;
 
-            double marginal_contribution = 0.0;
-
-            int start = g->row_ptr[curr_node];
-            int end = g->row_ptr[curr_node + 1];
-
-            // itero sui vicini del nodo corrente
-            for (int j = start; j < end; ++j)
+            // Costruisco la coalizione S = {nodi prima di curr_node nella permutazione}
+            size_t coalition_size = 0;
+            for (size_t j = 0; j < i; ++j)
             {
-                int neighbor = g->col_ind[j];
-
-                // trucco per contare gli archi solo una volta:
-                // se il mio vicino è vero, vuoldire che l'ho già controllato
-                // prima, quindi non devo aggiornare la contribution
-                if (!visited[neighbor])
-                {
-                    marginal_contribution += 1.0;
-                }
+                coalition[coalition_size++] = permutation[j];
             }
 
-            // penalizza se stiamo usando la funzione caratteristica 3
-            marginal_contribution -= size_penalty;
+            // Calcolo v(S) - valore della coalizione senza curr_node
+            double value_without = 0.0;
+            if (coalition_size > 0)
+            {
+                value_without = char_func(g, coalition, coalition_size);
+            }
 
+            // Aggiungo curr_node alla coalizione: S ∪ {curr_node}
+            coalition[coalition_size] = curr_node;
+
+            // Calcolo v(S ∪ {curr_node}) - valore della coalizione con curr_node
+            double value_with = char_func(g, coalition, coalition_size + 1);
+
+            // Contributo marginale = v(S ∪ {i}) - v(S)
+            double marginal_contribution = value_with - value_without;
+
+            // Accumulo il contributo marginale per questo nodo
             shapley_values[curr_node] += marginal_contribution;
         }
 
@@ -753,14 +768,14 @@ double *calculate_shapley_values(graph *g, int iterations, int version)
             printf("Iterazione %d/%d completata\n", iter, iterations);
     }
 
-    // calcola la media su tutte le iterazioni
+    // Calcola la media su tutte le iterazioni
     for (size_t i = 0; i < n; i++)
     {
         shapley_values[i] /= iterations;
     }
 
     free(permutation);
-    free(visited);
+    free(coalition);
     printf("Calcolo Shapley completato!\n");
     return shapley_values;
 }
