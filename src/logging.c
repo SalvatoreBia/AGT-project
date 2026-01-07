@@ -36,7 +36,7 @@ void log_node_update(long node_id, int old_strat, int new_strat, double utility_
 }
 
 void log_msg(const char *msg) {
-    // No-op for now unless we add a message field
+
     (void)msg;
 }
 
@@ -53,12 +53,11 @@ void log_close() {
     }
 }
 
-// --- PART 3 ---
+
 
 void log_part3_start(const char *mode) {
     if (!log_file) return;
-    // We treat this as a new "step" or section.
-    // JSONL: {"algorithm": "MATCHING", "mode": "...", "events": [
+
     fprintf(log_file, "{\"algorithm\": \"MATCHING\", \"mode\": \"%s\", \"events\": [", mode);
     first_update = 1;
 }
@@ -78,7 +77,7 @@ void log_part3_match(int buyer, int vendor, int budget, int price, double utilit
     first_update = 0;
 }
 
-// --- PART 4 ---
+
 
 void log_part4_start(int s, int t) {
     if (!log_file) return;

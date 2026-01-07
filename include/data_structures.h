@@ -58,4 +58,4 @@ graph* generate_barabasi_albert(int num_nodes, int m);
 void init_game(game_system *game, graph *g); 
 void free_game(game_system *game);
 
-#endif /* DATA_STRUCTURES_H */
+#endif

@@ -1,4 +1,4 @@
-// src/auction.c
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <limits.h>
@@ -8,14 +8,12 @@
 #include "../include/logging.h"
 
 #define INF_DIST 1e14
-#define PENALTY_COST 200.0 // Buyer disutility for traversing an unsecure node
-
-// --- Data Structures for Pathfinding ---
+#define PENALTY_COST 200.0
 
 typedef struct {
-    int *nodes;      // Array of node IDs in the path
-    int length;      // Number of nodes
-    double cost;     // Total Social Cost (Bids + Penalties)
+    int *nodes;
+    int length;
+    double cost;
 } path_t;
 
 typedef struct {
@@ -28,8 +26,6 @@ typedef struct {
     int size;
     int capacity;
 } min_heap;
-
-// --- Min Heap Implementation (for Dijkstra) ---
 
 static min_heap* create_heap(int capacity) {
     min_heap *h = malloc(sizeof(min_heap));
@@ -61,8 +57,15 @@ static void heap_push(min_heap *h, int id, double dist) {
 }
 
 static pq_node heap_pop(min_heap *h) {
+    if (h->size == 0) {
+        pq_node invalid = {-1, INF_DIST};
+        return invalid;
+    }
     pq_node top = h->data[0];
     pq_node last = h->data[--h->size];
+    if (h->size == 0) {
+        return top;
+    }
     int i = 0;
     while (i * 2 + 1 < h->size) {
         int child = i * 2 + 1;
@@ -77,16 +80,10 @@ static pq_node heap_pop(min_heap *h) {
     return top;
 }
 
-// --- Pathfinding ---
-
-// Calculates the weight of a node: Bid + (Penalty if unsecure)
-// Fixed: Removed unused 'node_id' parameter
 static double get_node_weight(int bid, unsigned char is_secure) {
     return (double)bid + (is_secure ? 0.0 : PENALTY_COST);
 }
 
-// Dijkstra's Algorithm
-// exclude_node: ID of a node to treat as "removed" (for VCG calculations). Pass -1 to include all.
 static path_t get_shortest_path(graph *g, int s, int t, int *bids,
                                 unsigned char *sec_set, int exclude_node)
 {
@@ -104,10 +101,8 @@ static path_t get_shortest_path(graph *g, int s, int t, int *bids,
 
     for(int i=0; i<n; i++) { dist[i] = INF_DIST; parent[i] = -1; }
 
-    min_heap *pq = create_heap(n * 2); // safety buffer
+    min_heap *pq = create_heap(n * 2);
 
-    // Initialization: Cost is incurred upon ENTERING/USING a node.
-    // We assume the source node's cost is part of the path cost.
     if (s != exclude_node) {
         dist[s] = get_node_weight(bids[s], sec_set[s]);
         heap_push(pq, s, dist[s]);
@@ -119,16 +114,15 @@ static path_t get_shortest_path(graph *g, int s, int t, int *bids,
 
         if (visited[u]) continue;
         visited[u] = 1;
-        if (u == t) break; // Found target
+        if (u == t) break;
 
-        // Relax Neighbors
         int start = g->row_ptr[u];
         int end = g->row_ptr[u + 1];
 
         for(int k=start; k<end; k++) {
             int v = g->col_ind[k];
 
-            if (v == exclude_node) continue; // Effectively remove node from graph
+            if (v == exclude_node) continue;
 
             double weight_v = get_node_weight(bids[v], sec_set[v]);
             if (dist[u] + weight_v < dist[v]) {
@@ -139,19 +133,15 @@ static path_t get_shortest_path(graph *g, int s, int t, int *bids,
         }
     }
 
-    // Reconstruct Path
     path_t res;
     res.cost = dist[t];
     res.length = 0;
     res.nodes = NULL;
 
     if (dist[t] < INF_DIST) {
-        // First pass: count nodes
         int count = 0;
         int curr = t;
         while (curr != -1) { count++; curr = parent[curr]; }
-
-        // Second pass: fill array
         res.length = count;
         res.nodes = malloc(count * sizeof(int));
         curr = t;
@@ -168,18 +158,15 @@ static path_t get_shortest_path(graph *g, int s, int t, int *bids,
     return res;
 }
 
-// --- Verification Logic ---
-
 static void verify_vcg_truthfulness(graph *g, int s, int t, int *bids,
                                     unsigned char *sec_set, int winner_id,
                                     double winner_payment)
 {
-    printf("\n    [Verification] Testing Dominant Strategy for Node %d...\n", winner_id);
+    printf("\n    [INFO] Testing Dominant Strategy for Node %d...\n", winner_id);
 
-    int true_cost = bids[winner_id]; // Assume current bid is the "True Cost"
+    int true_cost = bids[winner_id];
     double current_utility = winner_payment - true_cost;
 
-    // Test Scenarios: Undercutting and Overcharging
     int fake_bids[] = { true_cost - 20, true_cost - 1, true_cost + 1, true_cost + 50 };
     int num_tests = 4;
 
@@ -187,13 +174,10 @@ static void verify_vcg_truthfulness(graph *g, int s, int t, int *bids,
         int fake_bid = fake_bids[i];
         if (fake_bid <= 0) continue;
 
-        // 1. Temporarily Apply Lie
         bids[winner_id] = fake_bid;
 
-        // 2. Re-calculate Allocation (Winner Determination)
         path_t new_path = get_shortest_path(g, s, t, bids, sec_set, -1);
 
-        // 3. Check if still winning
         int still_winning = 0;
         if (new_path.length > 0) {
             for(int k=0; k<new_path.length; k++) {
@@ -207,43 +191,32 @@ static void verify_vcg_truthfulness(graph *g, int s, int t, int *bids,
         double new_utility = 0.0;
 
         if (still_winning) {
-            // Recalculate Payment: (Best Path without Winner) - (Chosen Path excluding Winner's Bid)
-            // Note: The "Best Path without Winner" doesn't change because Winner isn't in it.
-            // The "Chosen Path" weight changes because the bid changed.
-
             path_t alt_path = get_shortest_path(g, s, t, bids, sec_set, winner_id);
 
             if (alt_path.cost >= INF_DIST) {
-                // Monopoly case (Bridge): utility unchanged, lying doesn't help
                 new_utility = current_utility;
             } else {
                 double w_winner = get_node_weight(fake_bid, sec_set[winner_id]);
                 double cost_others = new_path.cost - w_winner;
                 double new_payment = alt_path.cost - cost_others;
 
-                // Utility = Payment - TRUE COST (not the fake bid)
                 new_utility = new_payment - true_cost;
             }
             if(alt_path.nodes) free(alt_path.nodes);
         } else {
-            // Lost the auction: Utility = 0
             new_utility = 0.0;
         }
 
-        // 4. Output Result
         int profitable = (new_utility > current_utility + 1e-5);
         printf("      -> Lie: %3d | Win: %s | Utility: %6.2f | %s\n",
                fake_bid, still_winning?"Y":"N", new_utility,
-               profitable ? "FAIL (Profitable Lie)" : "PASS (Not Better)");
+               profitable ? "[FAIL] Profitable Lie" : "[OK] Not Better");
 
         if(new_path.nodes) free(new_path.nodes);
 
-        // Restore Bid
         bids[winner_id] = true_cost;
     }
 }
-
-// --- Main VCG Runner ---
 
 void run_part4_vcg_auction(graph *g, unsigned char *sec_set) {
     printf("\n=== PART 4: VCG AUCTION MECHANISM ===\n");
@@ -251,21 +224,19 @@ void run_part4_vcg_auction(graph *g, unsigned char *sec_set) {
     printf("Disutility Penalty: %.0f\n", PENALTY_COST);
 
     if (g->num_nodes < 2) {
-        printf("Graph too small for routing.\n");
+        printf("[WARN] Graph too small for routing.\n");
         return;
     }
 
-    // 1. Setup Random Bids (Private Valuations)
     int *bids = malloc(g->num_nodes * sizeof(int));
     if (!bids) {
         fprintf(stderr, "Error: Memory allocation failed for bids\n");
         return;
     }
     for(int i=0; i<(int)g->num_nodes; i++) {
-        bids[i] = (rand() % 90) + 10; // Costs between 10 and 100
+        bids[i] = (rand() % 90) + 10;
     }
 
-    // 2. Select Buyers (Source and Target)
     int s = 0;
     int t = 0;
     while (s == t) {
@@ -274,47 +245,37 @@ void run_part4_vcg_auction(graph *g, unsigned char *sec_set) {
     }
     printf("Auction Request: Path from Node %d to %d\n", s, t);
 
-    // 3. Winner Determination (Optimal Allocation)
     path_t optimal = get_shortest_path(g, s, t, bids, sec_set, -1);
 
     if (optimal.length == 0 || optimal.cost >= INF_DIST) {
-        printf("No path exists between %d and %d. Auction cancelled.\n", s, t);
+        printf("[WARN] No path exists between %d and %d. Auction cancelled.\n", s, t);
         free(bids);
         return;
     }
 
-    printf("Winning Path: [ ");
+    printf("[INFO] Winning Path: [ ");
     for(int i=0; i<optimal.length; i++) printf("%d ", optimal.nodes[i]);
-    printf("]\nTotal Social Cost: %.2f\n", optimal.cost);
+    printf("]\n[INFO] Total Social Cost: %.2f\n", optimal.cost);
 
     LOG_P4_START(s, t);
-
-    // 4. Payment Calculation (Vickrey-Clarke-Groves)
 
     printf("\n--- VCG PAYMENTS ---\n");
     printf("| Node | Type  | Bid | External Cost | Payment | Utility |\n");
     printf("|------|-------|-----|---------------|---------|---------|\n");
 
-    // Variables to store data for verification AFTER the table is done
-    int verify_node = -1;
-    double verify_payment = 0.0;
 
     for(int i=0; i<optimal.length; i++) {
         int u = optimal.nodes[i];
 
-        // A. Cost of Others in current solution
         double w_u = get_node_weight(bids[u], sec_set[u]);
         double cost_others = optimal.cost - w_u;
 
-        // B. Social Cost if u did not exist
         path_t alt = get_shortest_path(g, s, t, bids, sec_set, u);
 
         if (alt.cost >= INF_DIST) {
-            // Bridge Node Case
             printf("| %4d | %s   | %3d |      INF      |   INF   |   INF   | (Monopoly/Bridge)\n",
                    u, sec_set[u]?"SEC":"UNS", bids[u]);
         } else {
-            // Standard VCG Payment
             double payment = alt.cost - cost_others;
             double utility = payment - bids[u];
 
@@ -322,26 +283,31 @@ void run_part4_vcg_auction(graph *g, unsigned char *sec_set) {
                    u, sec_set[u]?"SEC":"UNS", bids[u], alt.cost, payment, utility);
 
             LOG_P4_PAY(u, bids[u], payment);
-
-            // Store the first valid node for verification, but DO NOT run it yet
-            if (verify_node == -1) {
-                verify_node = u;
-                verify_payment = payment;
-            }
         }
 
         if(alt.nodes) free(alt.nodes);
     }
     printf("----------------------------------------------------------\n");
 
-    // 5. Verification (Run outside the loop so table isn't broken)
-    if (verify_node != -1) {
-        verify_vcg_truthfulness(g, s, t, bids, sec_set, verify_node, verify_payment);
+    printf("\n--- TRUTHFULNESS VERIFICATION (All Path Nodes) ---\n");
+    for(int i=0; i<optimal.length; i++) {
+        int u = optimal.nodes[i];
+        
+        double w_u = get_node_weight(bids[u], sec_set[u]);
+        double cost_others = optimal.cost - w_u;
+        path_t alt = get_shortest_path(g, s, t, bids, sec_set, u);
+        
+        if (alt.cost < INF_DIST) {
+            double payment = alt.cost - cost_others;
+            verify_vcg_truthfulness(g, s, t, bids, sec_set, u, payment);
+        } else {
+            printf("    [INFO] Node %d skipped (Monopoly/Bridge - no alternative path)\n", u);
+        }
+        if(alt.nodes) free(alt.nodes);
     }
 
-    // Cleanup
     if(optimal.nodes) free(optimal.nodes);
     free(bids);
     LOG_STEP_END();
-    printf("\n--- Auction Complete ---\n");
+    printf("\n[OK] Auction Complete\n");
 }

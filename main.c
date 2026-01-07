@@ -25,7 +25,7 @@ void print_usage(const char *prog_name)
     printf("  -n <nodes>       Number of nodes (default: 10000)\n");
     printf("  -k <val>         Degree/Param (Reg: degree, ER: avg degree, BA: m) (default: 4)\n");
     printf("  -t <type>        Graph Type (0=Regular, 1=Erdos, 2=Barabasi) (default: 0)\n");
-    printf("  -i <iterations>  Maximum number of iterations (default: 1000)\n");
+    printf("  -i <iterations>  Maximum number of iterations (default: 10000)\n");
     printf("  -a <algorithm>   Algorithm to use (1=BRD, 2=RM, 3=FP, 4=Shapley) (default: 3)\n");
     printf("  -v <version>     Characteristic function version for Shapley (1, 2, or 3) (default: 3)\n");
     printf("  -c <capacity>    Capacity Mode (0=Infinite, 1=Limited, 2=Both) (default: 0)\n");
@@ -34,14 +34,14 @@ void print_usage(const char *prog_name)
 
 int main(int argc, char *argv[])
 {
-    // Default values
+
     int num_nodes = 10000;
     int k_param = 4;
-    int max_it = 100000;
+    int max_it = 10000;
     int algorithm = ALGO_FP;
     int graph_type = TYPE_REGULAR;
     int shapley_version = 3;
-    int capacity_mode = 0; // 0=Inf, 1=Lim, 2=Both
+    int capacity_mode = 0;
 
     int opt;
     while ((opt = getopt(argc, argv, "n:k:i:a:t:v:c:h")) != -1)
@@ -49,10 +49,10 @@ int main(int argc, char *argv[])
         switch (opt)
         {
         case 'n':
-            num_nodes = strtoull(optarg, NULL, 10);
+            num_nodes = atoi(optarg);
             break;
         case 'k':
-            k_param = strtoull(optarg, NULL, 10);
+            k_param = atoi(optarg);
             break;
         case 't':
             graph_type = atoi(optarg);
@@ -63,7 +63,7 @@ int main(int argc, char *argv[])
             }
             break;
         case 'i':
-            max_it = strtoull(optarg, NULL, 10);
+            max_it = atoi(optarg);
             break;
         case 'a':
             algorithm = atoi(optarg);
@@ -102,11 +102,9 @@ int main(int argc, char *argv[])
     graph *g = NULL;
     srand((unsigned int)time(NULL));
 
-    // NOTE: If you want to force regeneration of graph based on type,
-    // you might want to disable the file loading or save different files for different types.
-    // For now, I will overwrite logic to prefer generation if arguments are specific.
 
-    printf("Generating graph type %d with %d nodes and param %d...\n", graph_type, num_nodes, k_param);
+
+    printf("[INFO] Generating graph type %d with %d nodes and param %d...\n", graph_type, num_nodes, k_param);
 
     if (graph_type == TYPE_REGULAR)
     {
@@ -114,14 +112,14 @@ int main(int argc, char *argv[])
     }
     else if (graph_type == TYPE_ERDOS)
     {
-        // Calculate probability p from average degree k: k = p * (N-1) => p = k / (N-1)
+
         double p = (double)k_param / (double)(num_nodes - 1);
-        printf("Erdos-Renyi: calculated p = %lf\n", p);
+        printf("[INFO] Erdos-Renyi: calculated p = %lf\n", p);
         g = generate_erdos_renyi(num_nodes, p);
     }
     else if (graph_type == TYPE_BARABASI)
     {
-        printf("Barabasi-Albert: m = %d\n", k_param);
+        printf("[INFO] Barabasi-Albert: m = %d\n", k_param);
         g = generate_barabasi_albert(num_nodes, k_param);
     }
 
@@ -131,10 +129,10 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    // Save generated graph
+
     save_graph_to_file(g, GRAPH_FILENAME);
 
-    // Initialize Logging
+
     char log_filename[256];
     snprintf(log_filename, sizeof(log_filename), "log_n%d_k%d_t%d_a%d_c%d.log", 
              num_nodes, k_param, graph_type, algorithm, capacity_mode);
@@ -144,23 +142,22 @@ int main(int argc, char *argv[])
 
     if (algorithm == ALGO_SHAPLEY)
     {
-        // COALITIONAL GAME APPROACH
+
         printf("\n=== COALITIONAL GAME APPROACH ===\n");
         printf("Algorithm: Shapley Values (Monte Carlo)\n");
         printf("Characteristic function version: %d\n", shapley_version);
         printf("Monte Carlo iterations: %d\n\n", max_it);
 
-        // Calcola Shapley values
+
         double *shapley_values = calculate_shapley_values(g, (int)max_it, shapley_version);
 
-        // Costruisci security set
-        // NOTE: assigning to local variable first, then we will use a common pointer later
+
         unsigned char *shapley_set = build_security_set_from_shapley(g, shapley_values);
 
         double elapsed = (double)(clock() - start_time) / CLOCKS_PER_SEC;
-        printf("\nShapley computation finished in %.2fs\n", elapsed);
+        printf("\n[OK] Shapley computation finished in %.2fs\n", elapsed);
 
-        // Analisi risultati
+
         int active_count = 0;
         for (int i = 0; i < g->num_nodes; ++i)
         {
@@ -168,7 +165,7 @@ int main(int argc, char *argv[])
                 active_count++;
         }
 
-        // Crea coalizione per verifiche
+
         int *coalition = malloc(active_count * sizeof(int));
         size_t idx = 0;
         for (int i = 0; i < g->num_nodes; ++i)
@@ -188,8 +185,8 @@ int main(int argc, char *argv[])
         printf("Valid Cover: %s\n", valid ? "YES" : "NO");
         printf("Minimal: %s\n", minimal ? "YES" : "NO");
 
-        // Stampa top 10 Shapley values
-        printf("\nTop 10 nodes by Shapley value:\n");
+
+        printf("\n--- Top 10 Nodes by Shapley Value ---\n");
         typedef struct
         {
             int id;
@@ -203,7 +200,7 @@ int main(int argc, char *argv[])
             sorted[i].value = shapley_values[i];
         }
 
-        // Simple bubble sort per top 10
+
         for (int i = 0; i < 10 && i < g->num_nodes; ++i)
         {
             for (int j = i + 1; j < g->num_nodes; ++j)
@@ -228,40 +225,17 @@ int main(int argc, char *argv[])
         free(sorted);
         free(shapley_values);
 
-        // IMPORTANT: We do NOT free shapley_set here, we will use it for Part 3/4
-        // But since we need a common interface, let's just run parts here or assign to a common pointer.
-        // To keep clean decoupling, let's assign to a pointer declared outside or trigger parts here? 
-        // Better: We will fall through to common code.
-        // Assign to a variable visible outside. But 'security_set' name conflicts if we just did that.
-        // Let's rely on a common 'final_set' pointer.
-        
-        // Hack: Since 'game' variable is local to main but initialized only in else, 
-        // we need a common pointer for the final security set array.
-        
-        // We will execute the parts AT THE END using this array.
-        // But wait, shapley_set is malloc'ed, game.strategies is malloc'ed.
-        // We need to manage memory.
-        
-        // Let's use a goto or simply continue execution.
-        // We need to store the result in a common place.
-        
-        // Let's allocate a new array for the unified result? Or just point to it.
-        // Simplest: use 'game.strategies' is not available here.
-        // Wait, game_system game; IS declared at top of main.
-        // So we can populate game.strategies manually for Shapley case!
-        
-        init_game(&game, g); // Reset game struct (allocates strategies)
-        // Copy shapley_set to strategies
+        init_game(&game, g);
+
         memcpy(game.strategies, shapley_set, g->num_nodes * sizeof(unsigned char));
         free(shapley_set);
         
-        // Mark as converged for logic consistency
-        // game.strategies is now populated.
+
 
     }
     else
     {
-        // STRATEGIC GAME APPROACH
+
         printf("\n=== STRATEGIC GAME APPROACH ===\n");
         init_game(&game, g);
 
@@ -284,18 +258,18 @@ int main(int argc, char *argv[])
         int converged = (result != -1);
 
         double elapsed = (double)(clock() - start_time) / CLOCKS_PER_SEC;
-        printf("\nSimulation finished in %.2fs\n", elapsed);
+        printf("\n[OK] Simulation finished in %.2fs\n", elapsed);
 
         if (converged)
         {
-            printf("Converged: YES\n");
+            printf("[OK] Converged: YES\n");
         }
         else
         {
-            printf("Converged: NO\n");
+            printf("[WARN] Converged: NO\n");
         }
 
-        // ANALISI RISULTATI
+
         int minimal = is_minimal(&game);
         int valid = is_valid_cover(&game);
 
@@ -320,24 +294,20 @@ int main(int argc, char *argv[])
             free_fictitious_system(&game);
         }
 
-    } // End of if/else (Shapley vs Game)
+    }
 
-    // === COMMON POST-PROCESSING (Parts 3 & 4) ===
-    // At this point, game.strategies (and game.g) should be populated with the result.
-    
-    // Run Matching Market (Part 3)
+
     if (capacity_mode == 0 || capacity_mode == 2) {
-        run_part3_matching_market(g, game.strategies, 0); // Infinite
+        run_part3_matching_market(g, game.strategies, 0);
     }
     if (capacity_mode == 1 || capacity_mode == 2) {
-        run_part3_matching_market(g, game.strategies, 1); // Limited
+        run_part3_matching_market(g, game.strategies, 1);
     }
 
-    // Run VCG Auction (Part 4)
+
     run_part4_vcg_auction(g, game.strategies);
 
-    // Final Cleanup
-    // Final Cleanup
+
     LOG_CLOSE();
     free_game(&game);
     free_graph(g);

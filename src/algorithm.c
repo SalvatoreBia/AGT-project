@@ -4,13 +4,8 @@
 #include <math.h>
 #include <string.h>
 #include <glib.h>
-#include <glib.h>
 #include "../include/algorithm.h"
 #include "../include/logging.h"
-
-/* ============================================================================
- * PRIVATE HELPER FUNCTIONS
- * ============================================================================ */
 
 static double get_random_double()
 {
@@ -31,16 +26,12 @@ static void shuffle_array(int *array, size_t n)
     }
 }
 
-/* ============================================================================
- * STRATEGIC GAME: UTILITY CALCULATION
- * ============================================================================ */
 
 double calculate_utility(game_system *game, int player_id, int strategy)
 {
     if (strategy == 1)
         return -COST_SECURITY;
 
-    // Strategy 0: pay penalty for each unsecured neighbor
     double curr_payoff = 0.0;
     int start = game->g->row_ptr[player_id];
     int end = game->g->row_ptr[player_id + 1];
@@ -55,10 +46,6 @@ double calculate_utility(game_system *game, int player_id, int strategy)
     }
     return curr_payoff;
 }
-
-/* ============================================================================
- * STRATEGIC GAME: BEST RESPONSE DYNAMICS (BRD)
- * ============================================================================ */
 
 int run_best_response_iteration(game_system *game)
 {
@@ -81,24 +68,19 @@ int run_best_response_iteration(game_system *game)
         {
             game->strategies[i] = best_strategy;
             change_occurred = 1;
-            double chosen_u = (best_strategy == 1) ? u_in : u_out;
-            LOG_NODE_UPDATE(i, curr_strategy, best_strategy, chosen_u);
+            LOG_NODE_UPDATE(i, curr_strategy, best_strategy, 
+                           (best_strategy == 1) ? u_in : u_out);
         }
     }
 
     return change_occurred;
 }
 
-/* ============================================================================
- * STRATEGIC GAME: REGRET MATCHING (RM)
- * ============================================================================ */
-
 void init_regret_system(game_system *game)
 {
     game->rs.regrets = (double *)calloc(game->num_players * 2, sizeof(double));
     game->rs.probs = (double *)calloc(game->num_players * 2, sizeof(double));
 
-    // Initialize with uniform probabilities
     for (int i = 0; i < game->num_players * 2; ++i)
     {
         game->rs.probs[i] = 0.5;
@@ -115,7 +97,6 @@ int run_regret_matching_iteration(game_system *game)
 {
     int nnodes = game->num_players;
 
-    // Step 1: Sample strategies based on probabilities from previous iteration
     for (int i = 0; i < nnodes; ++i)
     {
         double prob_1 = game->rs.probs[2 * i + 1];
@@ -128,7 +109,6 @@ int run_regret_matching_iteration(game_system *game)
 
     int is_nash = 1;
 
-    // Step 2: Calculate regrets and update probabilities for next iteration
     for (int i = 0; i < nnodes; ++i)
     {
         double u0 = calculate_utility(game, i, 0);
@@ -138,22 +118,18 @@ int run_regret_matching_iteration(game_system *game)
         double r0 = u0 - u_real;
         double r1 = u1 - u_real;
 
-        // Check for Nash equilibrium (no incentive to deviate)
         if (r0 > 1e-9 || r1 > 1e-9)
         {
             is_nash = 0;
         }
 
-        // Update cumulative regrets
         game->rs.regrets[2 * i] += r0;
         game->rs.regrets[2 * i + 1] += r1;
 
-        // Calculate positive regrets
         double r0_pos = (game->rs.regrets[2 * i] > 0) ? game->rs.regrets[2 * i] : 0.0;
         double r1_pos = (game->rs.regrets[2 * i + 1] > 0) ? game->rs.regrets[2 * i + 1] : 0.0;
         double sum = r0_pos + r1_pos;
 
-        // Update probabilities using regret matching
         if (sum > 1e-9)
         {
             game->rs.probs[2 * i] = r0_pos / sum;
@@ -166,31 +142,28 @@ int run_regret_matching_iteration(game_system *game)
         }
     }
 
-    return !is_nash; // Return 1 if not converged
+    return !is_nash;
+
 }
 
-/* ============================================================================
- * STRATEGIC GAME: FICTITIOUS PLAY (FP)
- * ============================================================================ */
+
 
 void reset_fictitious_system(game_system *game)
 {
-    // Set a fictitious history of length 100 to break symmetry
+
     game->fs.turn = 100;
 
-    // Initialize with random counts to create heterogeneous priors around the critical threshold
-    // Threshold is approx 0.975 for Cost=1, Penalty=10, Degree=4.
-    // We use turn=100 and counts in [90, 100] to seed some below and some above/near.
+
+
     for (int i = 0; i < game->num_players; ++i)
     {
-        // Random count between 90 and 100
-        int variance = rand() % 11; // 0 to 10
+
+        int variance = rand() % 11;
+
         game->fs.counts[i] = 90 + variance;
 
-        // Calculate initial belief based on this fictitious history
         game->fs.believes[i] = (double)game->fs.counts[i] / (double)game->fs.turn;
 
-        // Also randomize initial strategy to help escape basin
         game->strategies[i] = (rand() % 2);
     }
 }
@@ -211,31 +184,23 @@ void free_fictitious_system(game_system *game)
 
 int run_fictitious_play_iteration(game_system *game)
 {
-    // printf("DEBUG: FP iteration start, turn=%d\n", game->fs.turn);
+
     int n = game->num_players;
 
-    // 1. Update Beliefs
-    // Update beliefs based on accumulated history
     for (int i = 0; i < n; ++i)
     {
-        // counts[i] ci dice quante volte il giocatore i ha messo la security
-        // (cioé ha scelto la strategia 1).
-        // le credenze sono questo valore normalizzato al numero di turni
+
         game->fs.believes[i] = (double)game->fs.counts[i] / (double)game->fs.turn;
     }
 
     int change_occurred = 0;
     unsigned char *next_strategies = malloc(n * sizeof(unsigned char));
 
-    // 2. Best Response against Beliefs
     for (int i = 0; i < n; ++i)
     {
-        // Expected Utility of playing Strategy 1 (Security)
-        // Cost is fixed -1.0
+
         double eu_1 = -COST_SECURITY;
 
-        // Expected Utility of playing Strategy 0 (No Security)
-        // Sum of (-PENALTY_UNSECURED * Prop(Neighbor plays 0))
         double eu_0 = 0.0;
 
         int start = game->g->row_ptr[i];
@@ -244,14 +209,13 @@ int run_fictitious_play_iteration(game_system *game)
         for (int k = start; k < end; ++k)
         {
             int neighbor = game->g->col_ind[k];
-            // Probability neighbor plays 0 = 1.0 - Probability neighbor plays 1 (belief)
+
             double prob_neighbor_0 = 1.0 - game->fs.believes[neighbor];
             eu_0 -= PENALTY_UNSECURED * prob_neighbor_0;
         }
 
-        // Choose best strategy
-        // If tied, sticking to current or default preference (usually 1 if equal avoids penalty?)
-        // Here strict inequality for change:
+
+
         if (eu_1 > eu_0)
         {
             next_strategies[i] = 1;
@@ -267,8 +231,6 @@ int run_fictitious_play_iteration(game_system *game)
         }
     }
 
-    // 3. Update State
-    // Apply strategies and update history counts
     for (int i = 0; i < n; ++i)
     {
         int old_s = game->strategies[i];
@@ -288,9 +250,7 @@ int run_fictitious_play_iteration(game_system *game)
     return change_occurred;
 }
 
-/* ============================================================================
- * STRATEGIC GAME: VALIDATION HELPERS
- * ============================================================================ */
+
 
 int is_valid_cover(game_system *game)
 {
@@ -300,7 +260,6 @@ int is_valid_cover(game_system *game)
         if (game->strategies[u] == 1)
             continue;
 
-        // Se sono spento, controllo i vicini
         for (int k = g->row_ptr[u]; k < g->row_ptr[u + 1]; ++k)
         {
             int v = g->col_ind[k];
@@ -309,7 +268,7 @@ int is_valid_cover(game_system *game)
 
             if (game->strategies[v] == 0)
             {
-                // Trovato arco scoperto
+
                 return 0;
             }
         }
@@ -326,7 +285,6 @@ int is_minimal(game_system *game)
     if (!has_private)
         return 0;
 
-    // Identifica nodi con archi privati
     for (int u = 0; u < n; ++u)
     {
         for (int k = g->row_ptr[u]; k < g->row_ptr[u + 1]; ++k)
@@ -359,9 +317,7 @@ int is_minimal(game_system *game)
     return minimal;
 }
 
-/* ============================================================================
- * STRATEGIC GAME: SIMULATION RUNNER
- * ============================================================================ */
+
 
 int run_simulation(game_system *game, int algorithm, int max_it, int verbose)
 {
@@ -372,12 +328,12 @@ int run_simulation(game_system *game, int algorithm, int max_it, int verbose)
 
     while (game->iteration < max_it)
     {
-        // Check for Random Restart if not converged for a long time
+
         if (algorithm == ALGO_FP &&
             (game->iteration - last_restart_it) >= restart_interval)
         {
             if (verbose)
-                printf("--- It %d : Random Restart Triggered! ---\n", game->iteration);
+                printf("[INFO] Iteration %d: Random restart triggered\n", game->iteration);
             reset_fictitious_system(game);
             last_restart_it = game->iteration;
             no_change_streak = 0;
@@ -385,13 +341,15 @@ int run_simulation(game_system *game, int algorithm, int max_it, int verbose)
 
         if (verbose && game->iteration % 100 == 0)
         {
-            printf("--- It %d ---\n", game->iteration + 1);
+            printf("[INFO] Iteration %d\n", game->iteration + 1);
         }
 
         const char *algo_name = "UNKNOWN";
         if (algorithm == ALGO_BRD) algo_name = "BRD";
         else if (algorithm == ALGO_RM) algo_name = "RM";
         else if (algorithm == ALGO_FP) algo_name = "FP";
+        (void)algo_name;
+
 
         LOG_STEP_BEGIN(game->iteration, algo_name);
 
@@ -421,11 +379,12 @@ int run_simulation(game_system *game, int algorithm, int max_it, int verbose)
             no_change_streak = 0;
         }
 
-        if (no_change_streak >= 500) // Require streak of 500 unchanged iterations to allow beliefs to saturate
+        if (no_change_streak >= 500)
+
         {
             converged = 1;
             if (verbose)
-                printf("Convergence reached at it %d\n", game->iteration);
+                printf("[OK] Convergence reached at iteration %d\n", game->iteration);
             break;
         }
 
@@ -435,9 +394,7 @@ int run_simulation(game_system *game, int algorithm, int max_it, int verbose)
     return converged ? (int)game->iteration : -1;
 }
 
-/* ============================================================================
- * COALITIONAL GAME: EDGE STRUCTURE AND HASH FUNCTIONS
- * ============================================================================ */
+
 
 typedef struct
 {
@@ -477,7 +434,6 @@ int count_covered_edges(graph *g, int *coalition, size_t coalition_size)
         {
             int neighbor = g->col_ind[j];
 
-            // Normalize edge (ensure u < v)
             if (curr < neighbor)
             {
                 temp_edge.u = curr;
@@ -489,7 +445,6 @@ int count_covered_edges(graph *g, int *coalition, size_t coalition_size)
                 temp_edge.v = curr;
             }
 
-            // Add edge if not already in set
             if (!g_hash_table_contains(edges, &temp_edge))
             {
                 edge *new_e = g_new(edge, 1);
@@ -511,13 +466,11 @@ int is_coalition_valid_cover(graph *g, int *coalition, size_t coalition_size)
     if (!in_coalition)
         return 0;
 
-    // Mark nodes in coalition
     for (size_t i = 0; i < coalition_size; ++i)
     {
         in_coalition[coalition[i]] = 1;
     }
 
-    // Check if all edges are covered
     int is_valid = 1;
     for (int u = 0; u < g->num_nodes; ++u)
     {
@@ -525,9 +478,8 @@ int is_coalition_valid_cover(graph *g, int *coalition, size_t coalition_size)
         {
             int v = g->col_ind[k];
             if (u >= v)
-                continue; // Process each edge once
+                continue;
 
-            // Edge (u,v) is uncovered if both endpoints are outside the coalition
             if (!in_coalition[u] && !in_coalition[v])
             {
                 is_valid = 0;
@@ -554,21 +506,19 @@ int is_coalition_minimal(graph *g, int *coalition, size_t coalition_size)
         return 0;
     }
 
-    // Mark nodes in coalition
     for (size_t i = 0; i < coalition_size; ++i)
     {
         in_coalition[coalition[i]] = 1;
     }
 
-    // Identify nodes with private edges
-    // A private edge for node u is an edge (u,v) where u is in the coalition but v is not
     for (int u = 0; u < g->num_nodes; ++u)
     {
         for (int k = g->row_ptr[u]; k < g->row_ptr[u + 1]; ++k)
         {
             int v = g->col_ind[k];
             if (u >= v)
-                continue; // Process each edge once
+                continue;
+
 
             if (in_coalition[u] && !in_coalition[v])
             {
@@ -581,7 +531,6 @@ int is_coalition_minimal(graph *g, int *coalition, size_t coalition_size)
         }
     }
 
-    // A coalition is minimal if every node in it has at least one private edge
     int minimal = 1;
     for (size_t i = 0; i < coalition_size; ++i)
     {
@@ -597,12 +546,8 @@ int is_coalition_minimal(graph *g, int *coalition, size_t coalition_size)
     return minimal;
 }
 
-/**
- * funzione caratteristica 1:
- *      per tutti i nodi nella coalizione, conta il numero di archi
- *      unici coperti, fa il rateo archi coperti / tutti gli archi
- *      e penalizza se la coalizione passata forma un vertex cover NON minimale
- */
+
+
 double characteristic_function_v1(graph *g, int *coalition, size_t coalition_size)
 {
     if (coalition_size == 0)
@@ -615,7 +560,6 @@ double characteristic_function_v1(graph *g, int *coalition, size_t coalition_siz
     double fraction = (double)covered / (double)g->num_edges;
     double value = fraction * 100.0;
 
-    // Penalty for valid but non-minimal solutions
     if (is_coalition_valid_cover(g, coalition, coalition_size))
     {
         if (!is_coalition_minimal(g, coalition, coalition_size))
@@ -627,12 +571,7 @@ double characteristic_function_v1(graph *g, int *coalition, size_t coalition_siz
     return value;
 }
 
-/**
- * funzione caratteristica 2:
- *      il valore della funziona è il numero di archi coperti.
- *      se la coalizione forma un cover valido premio con +100
- *      e se è minimale premio con +50
- */
+
 double characteristic_function_v2(graph *g, int *coalition, size_t coalition_size)
 {
     if (coalition_size == 0)
@@ -657,12 +596,7 @@ double characteristic_function_v2(graph *g, int *coalition, size_t coalition_siz
     return value;
 }
 
-/**
- * funzione caratteristica 1:
- *      trovo tutti gli archi coperti dalla coalizione e penalizzo di
- *      |coalition| * 0.5 (più la coalition è grande, meno valore ottengo)
- *      se è un cover valido aggiungo +50 e se è minimale +30
- */
+
 double characteristic_function_v3(graph *g, int *coalition, size_t coalition_size)
 {
     if (coalition_size == 0)
@@ -687,18 +621,16 @@ double characteristic_function_v3(graph *g, int *coalition, size_t coalition_siz
     return value;
 }
 
+
 double *calculate_shapley_values(graph *g, int iterations, int version)
 {
     size_t n = g->num_nodes;
 
-    // array di valori di shapley
     double *shapley_values = calloc(n, sizeof(double));
 
-    // array che contiene una permutazione dei nodi
     int *permutation = malloc(n * sizeof(int));
 
-    // coalizione corrente S (nodi già aggiunti nella permutazione)
-    int *coalition = malloc(n * sizeof(int));
+    unsigned char *visited = malloc(n * sizeof(unsigned char));
 
     for (size_t i = 0; i < n; i++)
     {
@@ -722,53 +654,42 @@ double *calculate_shapley_values(graph *g, int iterations, int version)
         free(coalition);
         return NULL;
     }
+    printf("[INFO] Starting optimized Shapley calculation (%d iterations)...\n", iterations);
 
-    printf("Inizio calcolo Shapley usando characteristic_function_v%d (%d iterazioni)...\n", version, iterations);
-
-
-    // MONTE-CARLO: calcolo Shapley values tramite permutazioni casuali
     for (int iter = 0; iter < iterations; ++iter)
     {
-        // Genero permutazione casuale dei nodi
+
         shuffle_array(permutation, n);
 
-        // Per ogni posizione nella permutazione
         for (size_t i = 0; i < n; ++i)
         {
             int curr_node = permutation[i];
 
-            // Costruisco la coalizione S = {nodi prima di curr_node nella permutazione}
             size_t coalition_size = 0;
             for (size_t j = 0; j < i; ++j)
             {
                 coalition[coalition_size++] = permutation[j];
             }
 
-            // Calcolo v(S) - valore della coalizione senza curr_node
             double value_without = 0.0;
             if (coalition_size > 0)
             {
                 value_without = char_func(g, coalition, coalition_size);
             }
 
-            // Aggiungo curr_node alla coalizione: S ∪ {curr_node}
             coalition[coalition_size] = curr_node;
 
-            // Calcolo v(S ∪ {curr_node}) - valore della coalizione con curr_node
             double value_with = char_func(g, coalition, coalition_size + 1);
 
-            // Contributo marginale = v(S ∪ {i}) - v(S)
             double marginal_contribution = value_with - value_without;
 
-            // Accumulo il contributo marginale per questo nodo
             shapley_values[curr_node] += marginal_contribution;
         }
 
         if (iter % 100 == 0 && iter > 0)
-            printf("Iterazione %d/%d completata\n", iter, iterations);
+            printf("[INFO] Iteration %d/%d completed\n", iter, iterations);
     }
 
-    // Calcola la media su tutte le iterazioni
     for (size_t i = 0; i < n; i++)
     {
         shapley_values[i] /= iterations;
@@ -776,11 +697,10 @@ double *calculate_shapley_values(graph *g, int iterations, int version)
 
     free(permutation);
     free(coalition);
-    printf("Calcolo Shapley completato!\n");
+    printf("[OK] Shapley calculation completed\n");
     return shapley_values;
 }
 
-// helper per chiamare qsort in ordine descrescente
 static int compare_node_values(const void *a, const void *b)
 {
     typedef struct
@@ -798,15 +718,7 @@ static int compare_node_values(const void *a, const void *b)
     return 0;
 }
 
-/**
- * Build a minimal security set from Shapley values using a greedy approach
- * followed by minimization.
- *
- * Algorithm:
- * 1. Start with all nodes in the set (guaranteed to be a valid cover)
- * 2. Reverse delete: try removing nodes in order of increasing Shapley value
- * 3. Iterative minimization: remove nodes without private edges
- */
+
 unsigned char *build_security_set_from_shapley(graph *g, double *shapley_values)
 {
     size_t n = g->num_nodes;
@@ -817,7 +729,6 @@ unsigned char *build_security_set_from_shapley(graph *g, double *shapley_values)
         double shapley_value;
     } node_value_pair;
 
-    // Sort nodes by Shapley value (descending)
     node_value_pair *sorted_nodes = malloc(n * sizeof(node_value_pair));
     for (size_t i = 0; i < n; i++)
     {
@@ -826,15 +737,13 @@ unsigned char *build_security_set_from_shapley(graph *g, double *shapley_values)
     }
     qsort(sorted_nodes, n, sizeof(node_value_pair), compare_node_values);
 
-    printf("\nCostruzione minimal security set da Shapley values...\n");
+    printf("\n[INFO] Building minimal security set from Shapley values...\n");
 
-    // Start with full set
     unsigned char *security_set = calloc(n, sizeof(unsigned char));
     for (size_t i = 0; i < n; i++)
         security_set[i] = 1;
 
-    // Phase 1: Reverse Delete (remove weak nodes)
-    printf("Tentativo di minimizzazione (Reverse Delete Order)...\n");
+    printf("[INFO] Attempting minimization (reverse delete order)...\n");
     size_t removed_count = 0;
 
     for (size_t i = n; i > 0; i--)
@@ -842,10 +751,8 @@ unsigned char *build_security_set_from_shapley(graph *g, double *shapley_values)
         size_t index = i - 1;
         int candidate_node = sorted_nodes[index].node_id;
 
-        // Try removing the node
         security_set[candidate_node] = 0;
 
-        // Check if all edges are still covered
         int still_covered = 1;
         int start = g->row_ptr[candidate_node];
         int end = g->row_ptr[candidate_node + 1];
@@ -866,15 +773,14 @@ unsigned char *build_security_set_from_shapley(graph *g, double *shapley_values)
         }
         else
         {
-            // Cannot remove, restore
+
             security_set[candidate_node] = 1;
         }
     }
 
-    printf("Nodi rimossi: %zu. Dimensione set finale: %zu\n", removed_count, n - removed_count);
+    printf("[INFO] Nodes removed: %zu. Final set size: %zu\n", removed_count, n - removed_count);
 
-    // Phase 2: Ensure minimality by removing nodes without private edges
-    printf("Verifica minimalità finale (usando logica is_minimal)...\n");
+    printf("[INFO] Final minimality check (using is_minimal logic)...\n");
 
     int changed = 1;
     int extra_removed = 0;
@@ -884,13 +790,12 @@ unsigned char *build_security_set_from_shapley(graph *g, double *shapley_values)
         changed = 0;
         unsigned char *has_private = calloc(n, sizeof(unsigned char));
 
-        // Scan all edges to identify private edges
-        for (int u = 0; u < n; ++u)
+        for (size_t u = 0; u < n; ++u)
         {
             for (int k = g->row_ptr[u]; k < g->row_ptr[u + 1]; ++k)
             {
                 int v = g->col_ind[k];
-                if (u >= v)
+                if ((int)u >= v)
                     continue;
 
                 if (security_set[u] && !security_set[v])
@@ -904,7 +809,6 @@ unsigned char *build_security_set_from_shapley(graph *g, double *shapley_values)
             }
         }
 
-        // Remove one node without private edges
         for (size_t i = 0; i < n; i++)
         {
             if (security_set[i] && !has_private[i])
@@ -912,7 +816,7 @@ unsigned char *build_security_set_from_shapley(graph *g, double *shapley_values)
                 security_set[i] = 0;
                 extra_removed++;
                 changed = 1;
-                printf("  Rimosso nodo %d (nessun arco privato)\n", (int)i);
+                printf("  Removed node %d (no private edge)\n", (int)i);
                 break;
             }
         }
@@ -922,21 +826,20 @@ unsigned char *build_security_set_from_shapley(graph *g, double *shapley_values)
 
     if (extra_removed > 0)
     {
-        printf("Rimossi %d nodi addizionali per garantire minimalità\n", extra_removed);
+        printf("[INFO] Removed %d additional nodes to ensure minimality\n", extra_removed);
     }
     else
     {
-        printf("Il set era già minimale dopo la fase greedy\n");
+        printf("[OK] Set was already minimal after greedy phase\n");
     }
 
-    // Count final size
     size_t final_size = 0;
     for (size_t i = 0; i < n; i++)
     {
         if (security_set[i])
             final_size++;
     }
-    printf("Set minimale finale: %zu nodi\n", final_size);
+    printf("[OK] Final minimal set: %zu nodes\n", final_size);
 
     free(sorted_nodes);
     return security_set;

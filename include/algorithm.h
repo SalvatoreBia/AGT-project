@@ -26,7 +26,7 @@ void free_regret_system(game_system *game);
 void init_fictitious_system(game_system *game);
 void free_fictitious_system(game_system *game);
 
-// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 
 double characteristic_function_v1(graph *g, int *coalition, size_t coalition_size);
 double characteristic_function_v2(graph *g, int *coalition, size_t coalition_size);
@@ -40,4 +40,4 @@ int count_covered_edges(graph *g, int *coalition, size_t coalition_size);
 int is_coalition_valid_cover(graph *g, int *coalition, size_t coalition_size);
 int is_coalition_minimal(graph *g, int *coalition, size_t coalition_size);
 
-#endif /* ALGORITHM_H */
+#endif

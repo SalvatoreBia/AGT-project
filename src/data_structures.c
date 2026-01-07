@@ -5,7 +5,7 @@
 #include <time.h>
 #include "../include/data_structures.h"
 
-// Helper struct for temporary edge storage
+
 typedef struct {
     int u;
     int v;
@@ -50,7 +50,7 @@ void print_graph(graph *g)
 {
     if (!g)
         return;
-    printf("Graph CSR (%d nodes, %d edges)\n", g->num_nodes, g->num_edges);
+    printf("[INFO] Graph CSR (%d nodes, %d edges)\n", g->num_nodes, g->num_edges);
 
     int limit = g->num_nodes > 10 ? 10 : g->num_nodes;
     for (int i = 0; i < limit; ++i)
@@ -83,7 +83,7 @@ int save_graph_to_file(graph *g, const char *filename)
     fwrite(g->col_ind, sizeof(int), g->num_edges, f);
 
     fclose(f);
-    printf("Graph saved to %s\n", filename);
+    printf("[OK] Graph saved to %s\n", filename);
     return 1;
 }
 
@@ -112,8 +112,8 @@ graph *load_graph_from_file(const char *filename)
         return NULL;
     }
 
-    if (fread(g->row_ptr, sizeof(int), num_nodes + 1, f) != num_nodes + 1 ||
-        fread(g->col_ind, sizeof(int), num_edges, f) != num_edges)
+    if ((int)fread(g->row_ptr, sizeof(int), num_nodes + 1, f) != num_nodes + 1 ||
+        (int)fread(g->col_ind, sizeof(int), num_edges, f) != num_edges)
     {
         free_graph(g);
         fclose(f);
@@ -121,7 +121,7 @@ graph *load_graph_from_file(const char *filename)
     }
 
     fclose(f);
-    printf("Graph loaded from %s (%d nodes, %d edges)\n", filename, num_nodes, num_edges);
+    printf("[OK] Graph loaded from %s (%d nodes, %d edges)\n", filename, num_nodes, num_edges);
     return g;
 }
 
@@ -216,12 +216,8 @@ graph *generate_random_regular(int num_nodes, int degree)
     return g;
 }
 
-// ---------------------------------------------------------
-// NEW: Erdos-Renyi Generator
-// ---------------------------------------------------------
+
 graph *generate_erdos_renyi(int num_nodes, double p) {
-    // Estimating number of edges for allocation (could overflow if p is large, using dynamic array is safer)
-    // To keep it simple in C, we'll use a dynamic growing array of edges.
     
     size_t capacity = num_nodes * 10; 
     size_t count = 0;
@@ -231,12 +227,12 @@ graph *generate_erdos_renyi(int num_nodes, double p) {
     int *degrees = (int *)calloc(num_nodes, sizeof(int));
     if(!degrees) { free(edge_list); return NULL; }
 
-    // Generate Edges
+
     for (int i = 0; i < num_nodes; ++i) {
         for (int j = i + 1; j < num_nodes; ++j) {
             double r = (double)rand() / (double)RAND_MAX;
             if (r < p) {
-                // Add edge
+
                 if (count >= capacity) {
                     capacity *= 2;
                     edge_t *temp = realloc(edge_list, capacity * sizeof(edge_t));
@@ -256,8 +252,7 @@ graph *generate_erdos_renyi(int num_nodes, double p) {
         }
     }
 
-    // Convert to CSR
-    // Total directed edges in CSR = 2 * undirected edges
+
     graph *g = create_graph(num_nodes, count * 2);
     if (!g) {
         free(edge_list);
@@ -265,19 +260,19 @@ graph *generate_erdos_renyi(int num_nodes, double p) {
         return NULL;
     }
 
-    // Fill row_ptr (prefix sum)
+
     g->row_ptr[0] = 0;
     for (int i = 0; i < num_nodes; ++i) {
         g->row_ptr[i+1] = g->row_ptr[i] + degrees[i];
     }
 
-    // Temporary array to track insertion position for each node
+
     int *current_pos = (int *)malloc(num_nodes * sizeof(int));
     for (int i = 0; i < num_nodes; ++i) {
         current_pos[i] = g->row_ptr[i];
     }
 
-    // Fill col_ind
+
     for (size_t i = 0; i < count; ++i) {
         int u = edge_list[i].u;
         int v = edge_list[i].v;
@@ -293,29 +288,23 @@ graph *generate_erdos_renyi(int num_nodes, double p) {
     return g;
 }
 
-// ---------------------------------------------------------
-// NEW: Barabasi-Albert Generator
-// ---------------------------------------------------------
+
 graph *generate_barabasi_albert(int num_nodes, int m) {
     if (m < 1 || m >= num_nodes) return NULL;
 
-    // We start with m+1 nodes fully connected (clique) to ensure we have a valid start
-    // Number of edges in initial clique: (m+1)*m / 2
-    // Number of edges added by remaining nodes: (num_nodes - (m+1)) * m
     
     int init_nodes = m + 1;
     int approx_edges = (init_nodes * m) / 2 + (num_nodes - init_nodes) * m;
     
-    // Allocate space for edges
+
     edge_t *edge_list = (edge_t *)malloc(approx_edges * sizeof(edge_t));
     int edge_count = 0;
 
-    // Repeated nodes array for preferential attachment (stores node ID proportional to degree)
-    // Size approx 2 * num_edges
+
     int *repeated_nodes = (int *)malloc(approx_edges * 2 * sizeof(int));
     int repeated_count = 0;
 
-    // 1. Initialize with a clique of size m+1
+
     for (int i = 0; i < init_nodes; ++i) {
         for (int j = i + 1; j < init_nodes; ++j) {
             edge_list[edge_count].u = i;
@@ -327,17 +316,17 @@ graph *generate_barabasi_albert(int num_nodes, int m) {
         }
     }
 
-    // 2. Add remaining nodes
+
     int *targets = (int *)malloc(m * sizeof(int));
 
     for (int i = init_nodes; i < num_nodes; ++i) {
-        // Select m distinct nodes from repeated_nodes
+
         int added = 0;
         while (added < m) {
             int r_idx = rand() % repeated_count;
             int target = repeated_nodes[r_idx];
             
-            // Check for duplicates
+
             int duplicate = 0;
             for (int k = 0; k < added; ++k) {
                 if (targets[k] == target) {
@@ -350,7 +339,7 @@ graph *generate_barabasi_albert(int num_nodes, int m) {
             }
         }
 
-        // Add edges connecting new node i to targets
+
         for (int k = 0; k < m; ++k) {
             int target = targets[k];
             edge_list[edge_count].u = i;
@@ -365,7 +354,7 @@ graph *generate_barabasi_albert(int num_nodes, int m) {
     free(targets);
     free(repeated_nodes);
 
-    // 3. Convert to CSR (Calculate degrees, alloc, fill)
+
     int *degrees = (int *)calloc(num_nodes, sizeof(int));
     for (int i = 0; i < edge_count; ++i) {
         degrees[edge_list[i].u]++;
@@ -374,13 +363,12 @@ graph *generate_barabasi_albert(int num_nodes, int m) {
 
     graph *g = create_graph(num_nodes, edge_count * 2);
     
-    // Row pointers
+
     g->row_ptr[0] = 0;
     for (int i = 0; i < num_nodes; ++i) {
         g->row_ptr[i+1] = g->row_ptr[i] + degrees[i];
     }
 
-    // Fill col_ind
     int *current_pos = (int *)malloc(num_nodes * sizeof(int));
     for (int i = 0; i < num_nodes; ++i) {
         current_pos[i] = g->row_ptr[i];

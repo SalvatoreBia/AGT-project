@@ -3,8 +3,7 @@
 
 #include <stddef.h>
 
-// If compiled with -DENABLE_LOGGING, these macros transform into function calls.
-// Otherwise, they expand to empty statements.
+
 
 #ifdef ENABLE_LOGGING
 
@@ -15,7 +14,7 @@ void log_msg(const char *msg);
 void log_step_end();
 void log_close();
 
-// New functions for Parts 3 & 4
+
 void log_part3_start(const char *mode);
 void log_part3_iter(int iteration, int flow_added, double cost_added);
 void log_part3_match(int buyer, int vendor, int budget, int price, double utility);
@@ -30,7 +29,7 @@ void log_part4_payment(int node, int bid, double payment);
 #define LOG_STEP_END() log_step_end()
 #define LOG_CLOSE() log_close()
 
-// Macros for Parts 3 & 4
+
 #define LOG_P3_START(mode) log_part3_start(mode)
 #define LOG_P3_ITER(it, f, c) log_part3_iter(it, f, c)
 #define LOG_P3_MATCH(b, v, bud, p, u) log_part3_match(b, v, bud, p, u)
@@ -56,4 +55,4 @@ void log_part4_payment(int node, int bid, double payment);
 
 #endif
 
-#endif // LOGGING_H
+#endif

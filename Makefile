@@ -30,7 +30,7 @@ OBJ_DIR := build
 OBJ := $(patsubst %.c,$(OBJ_DIR)/%.o,$(SRC))
 TARGET := $(OBJ_DIR)/main
 
-.PHONY: all run run-shapley run-fp run-brd run-rm clean dirs
+.PHONY: all run clean dirs
 
 all: dirs $(TARGET)
 
@@ -48,25 +48,6 @@ $(OBJ_DIR)/%.o: %.c
 
 run: all
 	./$(TARGET)
-
-# Run with Shapley Values (Coalitional Game)
-run-shapley: all
-	./$(TARGET) -a 4 -n 100 -k 4 -i 500 -v 3
-
-# Run with Fictitious Play
-run-fp: all
-	./$(TARGET) -a 3 -n 100 -k 4 -i 1000
-
-# Run with Best Response Dynamics
-run-brd: all
-	./$(TARGET) -a 1 -n 100 -k 4 -i 1000
-
-# Run with Regret Matching
-run-rm: all
-	./$(TARGET) -a 2 -n 100 -k 4 -i 1000
-
-test_1000: $(OBJ_DIR)/test_convergence_1000.o $(OBJ_DIR)/src/algorithm.o $(OBJ_DIR)/src/data_structures.o
-	$(CC) $(CFLAGS) -o $(OBJ_DIR)/test_convergence_1000 $^ $(LDFLAGS)
 
 clean:
 	rm -rf $(OBJ_DIR)

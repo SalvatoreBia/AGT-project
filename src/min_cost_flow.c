@@ -1,10 +1,9 @@
-// src/min_cost_flow.c
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
 #include <stdint.h>
-#include <time.h>
 #include <time.h>
 #include "../include/min_cost_flow.h"
 #include "../include/logging.h"
@@ -12,13 +11,13 @@
 #define INF_COST 1e9
 #define INF_CAP  1000000
 
-// --- internal flow network structures ---
+
 
 typedef struct {
     int to;
-    int rev;      // index of the reverse edge in the "to" node's list
-    int cap;      // residual capacity
-    double cost;  // cost per unit flow
+    int rev;
+    int cap;
+    double cost;
 } flow_edge;
 
 typedef struct {
@@ -38,7 +37,7 @@ typedef struct {
     int capacity;
 } vendor_t;
 
-// --- Helper Functions for Flow Network ---
+
 
 static flow_network* create_flow_network(int n) {
     flow_network *fn = malloc(sizeof(flow_network));
@@ -53,22 +52,34 @@ static flow_network* create_flow_network(int n) {
 }
 
 static void add_flow_edge(flow_network *fn, int u, int v, int cap, double cost) {
-    // Ensure capacity for forward edge
+
     if (fn->adj[u].count == fn->adj[u].capacity) {
-        fn->adj[u].capacity = (fn->adj[u].capacity == 0) ? 4 : fn->adj[u].capacity * 2;
-        fn->adj[u].edges = realloc(fn->adj[u].edges, fn->adj[u].capacity * sizeof(flow_edge));
-    }
-    // Ensure capacity for backward edge
-    if (fn->adj[v].count == fn->adj[v].capacity) {
-        fn->adj[v].capacity = (fn->adj[v].capacity == 0) ? 4 : fn->adj[v].capacity * 2;
-        fn->adj[v].edges = realloc(fn->adj[v].edges, fn->adj[v].capacity * sizeof(flow_edge));
+        int new_cap = (fn->adj[u].capacity == 0) ? 4 : fn->adj[u].capacity * 2;
+        flow_edge *temp = realloc(fn->adj[u].edges, new_cap * sizeof(flow_edge));
+        if (!temp) {
+            fprintf(stderr, "Error: Failed to realloc edges for node %d\n", u);
+            return;
+        }
+        fn->adj[u].edges = temp;
+        fn->adj[u].capacity = new_cap;
     }
 
-    // Add forward edge
+    if (fn->adj[v].count == fn->adj[v].capacity) {
+        int new_cap = (fn->adj[v].capacity == 0) ? 4 : fn->adj[v].capacity * 2;
+        flow_edge *temp = realloc(fn->adj[v].edges, new_cap * sizeof(flow_edge));
+        if (!temp) {
+            fprintf(stderr, "Error: Failed to realloc edges for node %d\n", v);
+            return;
+        }
+        fn->adj[v].edges = temp;
+        fn->adj[v].capacity = new_cap;
+    }
+
+
     flow_edge a = {v, fn->adj[v].count, cap, cost};
     fn->adj[u].edges[fn->adj[u].count] = a;
     
-    // Add backward edge (0 capacity, negative cost)
+
     flow_edge b = {u, fn->adj[u].count, 0, -cost};
     fn->adj[v].edges[fn->adj[v].count] = b;
 
@@ -84,14 +95,19 @@ static void free_flow_network(flow_network *fn) {
     free(fn);
 }
 
-// --- SPFA Algorithm (Shortest Path Faster Algorithm) ---
-// Returns 1 if a path exists from s to t with residual capacity, 0 otherwise.
-// Populates 'dist', 'parent_node', and 'parent_edge' arrays.
+
 static int spfa(flow_network *fn, int s, int t, double *dist, int *p_node, int *p_edge) {
     int n = fn->num_nodes;
     int *in_queue = calloc(n, sizeof(int));
-    int *queue = malloc((n + 5) * sizeof(int)); // Circular queue
+    int *queue = malloc((n + 5) * sizeof(int));
     int q_head = 0, q_tail = 0;
+
+    if (!in_queue || !queue) {
+        fprintf(stderr, "Error: Memory allocation failed in spfa\n");
+        free(in_queue);
+        free(queue);
+        return 0;
+    }
 
     for(int i=0; i<n; i++) {
         dist[i] = INF_COST;
@@ -111,7 +127,7 @@ static int spfa(flow_network *fn, int s, int t, double *dist, int *p_node, int *
         for(int i=0; i<fn->adj[u].count; i++) {
             flow_edge *e = &fn->adj[u].edges[i];
             
-            // If capacity available and we found a cheaper path
+
             if (e->cap > 0 && dist[e->to] > dist[u] + e->cost + 1e-9) {
                 dist[e->to] = dist[u] + e->cost;
                 p_node[e->to] = u;
@@ -129,10 +145,10 @@ static int spfa(flow_network *fn, int s, int t, double *dist, int *p_node, int *
     free(in_queue);
     free(queue);
 
-    return (dist[t] < INF_COST / 2); // Return true if reachable
+    return (dist[t] < INF_COST / 2);
 }
 
-// --- Min Cost Max Flow Solver ---
+
 static double min_cost_max_flow(flow_network *fn, int s, int t, int *flow_out) {
     double total_cost = 0;
     int total_flow = 0;
@@ -140,9 +156,18 @@ static double min_cost_max_flow(flow_network *fn, int s, int t, int *flow_out) {
     int *p_node = malloc(fn->num_nodes * sizeof(int));
     int *p_edge = malloc(fn->num_nodes * sizeof(int));
 
-    // Successive shortest path using SPFA
+    if (!dist || !p_node || !p_edge) {
+        fprintf(stderr, "Error: Memory allocation failed in min_cost_max_flow\n");
+        free(dist);
+        free(p_node);
+        free(p_edge);
+        if (flow_out) *flow_out = 0;
+        return 0;
+    }
+
+
     while(spfa(fn, s, t, dist, p_node, p_edge)) {
-        // Find bottleneck capacity along the path
+
         int push = INF_CAP;
         int curr = t;
         while(curr != s) {
@@ -154,7 +179,7 @@ static double min_cost_max_flow(flow_network *fn, int s, int t, int *flow_out) {
             curr = prev;
         }
 
-        // Apply flow
+
         curr = t;
         while(curr != s) {
             int prev = p_node[curr];
@@ -170,11 +195,7 @@ static double min_cost_max_flow(flow_network *fn, int s, int t, int *flow_out) {
 
         total_flow += push;
         
-        // Log iteration?
-        LOG_P3_ITER(0, push, (double)push * (total_cost/total_flow)); // Approximation or just log push?
-        // Actually cost per unit for this path is (total_cost increment / push).
-        // But we don't track incremental cost easily here without diff.
-        // Let's just log total_flow so far.
+
         LOG_P3_ITER(total_flow, push, total_cost);
     }
 
@@ -187,7 +208,7 @@ static double min_cost_max_flow(flow_network *fn, int s, int t, int *flow_out) {
 }
 
 
-// Helper function to verify matching constraints
+
 static void verify_matching_constraints(flow_network *fn, int *budgets, 
                                         vendor_t *vendors, 
                                         int num_buyers, int num_vendors) 
@@ -196,25 +217,22 @@ static void verify_matching_constraints(flow_network *fn, int *budgets,
     int all_passed = 1;
     int *vendor_sales = calloc(num_vendors, sizeof(int));
 
-    // 1. Check Budget Constraints for every match
+
     for (int i = 0; i < num_buyers; i++) {
-        int u = i + 1; // Buyer Node ID in flow network
+        int u = i + 1;
         
-        // Check outgoing edges from Buyer
+
         for (int k = 0; k < fn->adj[u].count; k++) {
             flow_edge e = fn->adj[u].edges[k];
             
-            // Identify if this edge goes to a Vendor
-            // Vendor Node IDs are: [num_buyers + 1] to [num_buyers + num_vendors]
+
             if (e.to > num_buyers && e.to <= num_buyers + num_vendors) {
                 
-                // In Min-Cost Flow with capacity 1:
-                // residual_cap == 0 means flow was pushed (Matched)
-                // residual_cap == 1 means no flow (Unmatched)
+
                 if (e.cap == 0) { 
                     int v_idx = e.to - num_buyers - 1;
                     
-                    // CHECK A: Budget >= Price
+
                     if (budgets[i] < vendors[v_idx].price) {
                         printf("[FAIL] Budget Violation! Buyer %d (Budget: %d) matched with Vendor %d (Price: %d)\n",
                                u, budgets[i], v_idx, vendors[v_idx].price);
@@ -227,9 +245,9 @@ static void verify_matching_constraints(flow_network *fn, int *budgets,
         }
     }
 
-    // 2. Check Capacity Constraints for every vendor
+
     for (int j = 0; j < num_vendors; j++) {
-        // CHECK B: Sales <= Capacity
+
         if (vendor_sales[j] > vendors[j].capacity) {
             printf("[FAIL] Capacity Violation! Vendor %d sold %d items (Capacity: %d)\n",
                    j, vendor_sales[j], vendors[j].capacity);
@@ -238,81 +256,78 @@ static void verify_matching_constraints(flow_network *fn, int *budgets,
     }
 
     if (all_passed) {
-        printf("[SUCCESS] All constraints (Budget >= Price, Capacity Limits) are satisfied.\n");
+        printf("[OK] All constraints (Budget >= Price, Capacity Limits) satisfied\n");
     } else {
-        printf("[WARNING] Some constraints were violated. Check graph construction.\n");
+        printf("[WARN] Some constraints were violated. Check graph construction.\n");
     }
 
     free(vendor_sales);
     printf("-----------------------------\n");
 }
 
-// --- Part 3 Wrapper Implementation ---
+
 
 static void solve_matching_limited_capacity(int* buyers, int num_buyers, int* budgets, 
                                             vendor_t* vendors, int num_vendors) 
 {
-    printf("Strategy: Min-Cost Max-Flow (Limited Capacity)\n");
+    (void)buyers;
+    printf("[INFO] Strategy: Min-Cost Max-Flow (Limited Capacity)\n");
     
-    // 4. Build Flow Network
-    // Nodes: 0 (Source), 1..B (Buyers), B+1..B+V (Vendors), B+V+1 (Sink)
+
     int s = 0;
     int t = num_buyers + num_vendors + 1;
     int num_nodes_flow = t + 1;
     
     flow_network *fn = create_flow_network(num_nodes_flow);
 
-    // Edges Source -> Buyers
+
     for(int i=0; i<num_buyers; i++) {
         add_flow_edge(fn, s, i + 1, 1, 0.0);
     }
 
-    // Edges Buyers -> Vendors
-    // Only if Budget >= Price. Cost = -Utility.
-    // Utility = (Budget - Price) + (Quality * 10)
+
     for(int i=0; i<num_buyers; i++) {
         for(int j=0; j<num_vendors; j++) {
             if (budgets[i] >= vendors[j].price) {
                 double utility = (double)(budgets[i] - vendors[j].price) + (vendors[j].quality * 10.0);
-                // We minimize cost, so cost = -utility
+
                 add_flow_edge(fn, i + 1, num_buyers + j + 1, 1, -utility);
             }
         }
     }
 
-    // Edges Vendors -> Sink
+
     for(int j=0; j<num_vendors; j++) {
         add_flow_edge(fn, num_buyers + j + 1, t, vendors[j].capacity, 0.0);
     }
 
-    // 5. Solve
+
     int total_flow = 0;
     double min_cost = min_cost_max_flow(fn, s, t, &total_flow);
     double max_welfare = -min_cost;
 
-    LOG_P3_MATCH(total_flow, num_buyers, 0, 0, max_welfare); // Abuse arguments or make generic? 
-    // Wait, let's just log the summary as a 'match' event with special ID?
-    // Or iterate over the flows to see who matched whom.
+    LOG_P3_MATCH(total_flow, num_buyers, 0, 0, max_welfare);
     
-    // Log individual matches by inspecting residual capacity
+
     for(int i=0; i<num_buyers; i++) {
         int u = i + 1;
         for(int k=0; k<fn->adj[u].count; k++) {
             flow_edge e = fn->adj[u].edges[k];
-             if (e.to > num_buyers && e.to <= num_buyers + num_vendors) {
-                if (e.cap == 0) { // Flow usage = 1 (Matched)
-                    int v_idx = e.to - num_buyers - 1;
-                    double util = (double)(budgets[i] - vendors[v_idx].price) + (vendors[v_idx].quality * 10.0);
-                    LOG_P3_MATCH(u, v_idx, budgets[i], vendors[v_idx].price, util);
+            if (e.to > num_buyers && e.to <= num_buyers + num_vendors) {
+                if (e.cap == 0) {
+                    int vendor_idx = e.to - num_buyers - 1;
+                    LOG_P3_MATCH(u, vendor_idx, budgets[i], vendors[vendor_idx].price, 
+                                (double)(budgets[i] - vendors[vendor_idx].price) + (vendors[vendor_idx].quality * 10.0));
+                    (void)vendor_idx;
                 }
              }
         }
     }
 
-    // 6. Print Results
-    printf("Matching Calculation Complete.\n");
-    printf("Total Matched: %d / %d buyers\n", total_flow, num_buyers);
-    printf("Total Social Welfare: %.2f\n", max_welfare);
+
+    printf("[OK] Matching Calculation Complete\n");
+    printf("[INFO] Total Matched: %d / %d buyers\n", total_flow, num_buyers);
+    printf("[INFO] Total Social Welfare: %.2f\n", max_welfare);
 
     verify_matching_constraints(fn, budgets, vendors, num_buyers, num_vendors);
     free_flow_network(fn);
@@ -321,17 +336,16 @@ static void solve_matching_limited_capacity(int* buyers, int num_buyers, int* bu
 static void solve_matching_infinite_capacity(int* buyers, int num_buyers, int* budgets, 
                                              vendor_t* vendors, int num_vendors) 
 {
-    printf("Strategy: Greedy (Infinite Capacity)\n");
+    (void)buyers;
+    printf("[INFO] Strategy: Greedy (Infinite Capacity)\n");
     
     int total_matched = 0;
     double total_welfare = 0.0;
     
-    // For infinite capacity, capacity constraints don't matter.
-    // Each buyer simply greedily picks the vendor that maximizes their utility,
-    // provided the vendor is affordable.
+
     
     for(int i=0; i<num_buyers; i++) {
-        double best_utility = -1e18; // Negative infinity
+        double best_utility = -1e18;
         int picked_vendor = -1;
         
         for(int j=0; j<num_vendors; j++) {
@@ -351,16 +365,16 @@ static void solve_matching_infinite_capacity(int* buyers, int num_buyers, int* b
         }
     }
     
-    printf("Matching Calculation Complete.\n");
-    printf("Total Matched: %d / %d buyers\n", total_matched, num_buyers);
-    printf("Total Social Welfare: %.2f\n", total_welfare);
+    printf("[OK] Matching Calculation Complete\n");
+    printf("[INFO] Total Matched: %d / %d buyers\n", total_matched, num_buyers);
+    printf("[INFO] Total Social Welfare: %.2f\n", total_welfare);
 }
 
 void run_part3_matching_market(graph *g, unsigned char *security_set, int limited_capacity) {
     printf("\n=== PART 3: RESOURCE ALLOCATION (Min-Cost Flow) ===\n");
-    printf("Mode: %s Capacity\n", limited_capacity ? "Limited" : "Infinite");
+    printf("[INFO] Mode: %s Capacity\n", limited_capacity ? "Limited" : "Infinite");
 
-    // 1. Identify Buyers (Players in Security Set)
+
     int *buyers = malloc(g->num_nodes * sizeof(int));
     int num_buyers = 0;
     for(int i=0; i<g->num_nodes; i++) {
@@ -370,33 +384,32 @@ void run_part3_matching_market(graph *g, unsigned char *security_set, int limite
     }
     
     if (num_buyers == 0) {
-        printf("No buyers in security set. Skipping.\n");
+        printf("[WARN] No buyers in security set. Skipping.\n");
         free(buyers);
         return;
     }
 
-    // 2. Generate Random Budgets for Buyers
+
     int *budgets = malloc(num_buyers * sizeof(int));
     for(int i=0; i<num_buyers; i++) {
-        budgets[i] = (rand() % 100) + 1; // 1 to 100
+        budgets[i] = (rand() % 100) + 1;
     }
 
-    // 3. Generate Random Vendors
-    // Let's assume number of vendors is roughly 1/2 of number of buyers for interesting competition
+
     int num_vendors = (num_buyers / 2) + 1; 
     vendor_t *vendors = malloc(num_vendors * sizeof(vendor_t));
 
     for(int i=0; i<num_vendors; i++) {
-        vendors[i].price = (rand() % 100) + 1;    // Price 1-100
-        vendors[i].quality = (rand() % 10) + 1;   // Quality 1-10
+        vendors[i].price = (rand() % 100) + 1;
+        vendors[i].quality = (rand() % 10) + 1;
         if (limited_capacity) {
-            vendors[i].capacity = (rand() % 5) + 1; // 1 to 5 items
+            vendors[i].capacity = (rand() % 5) + 1;
         } else {
-            vendors[i].capacity = num_buyers;     // effectively infinite
+            vendors[i].capacity = num_buyers;
         }
     }
     
-    // Dispatch to Solver
+
     if (limited_capacity) {
         LOG_P3_START("Limited");
         solve_matching_limited_capacity(buyers, num_buyers, budgets, vendors, num_vendors);
@@ -406,7 +419,7 @@ void run_part3_matching_market(graph *g, unsigned char *security_set, int limite
     }
     LOG_STEP_END();
 
-    // Cleanup
+
     free(buyers);
     free(budgets);
     free(vendors);
