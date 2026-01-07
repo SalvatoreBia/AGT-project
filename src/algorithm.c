@@ -68,7 +68,7 @@ int run_best_response_iteration(game_system *game)
         {
             game->strategies[i] = best_strategy;
             change_occurred = 1;
-            LOG_NODE_UPDATE(i, curr_strategy, best_strategy, 
+            LOG_NODE_UPDATE(i, curr_strategy, best_strategy,
                            (best_strategy == 1) ? u_in : u_out);
         }
     }
@@ -630,7 +630,7 @@ double *calculate_shapley_values(graph *g, int iterations, int version)
 
     int *permutation = malloc(n * sizeof(int));
 
-    unsigned char *visited = malloc(n * sizeof(unsigned char));
+    int *coalition = malloc(n * sizeof(int));
 
     for (size_t i = 0; i < n; i++)
     {
