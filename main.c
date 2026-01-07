@@ -38,10 +38,10 @@ int main(int argc, char *argv[])
 
     int num_nodes = 10000;
     int k_param = 4;
-    int max_it = 10000;
+    int max_it = 1000;
     int algorithm = ALGO_FP;
     int graph_type = TYPE_REGULAR;
-    int shapley_version = 3;
+    int shapley_version = 4;
     int capacity_mode = 0;
     char *input_file = NULL;
 

@@ -40,49 +40,66 @@ static gboolean edge_equal(gconstpointer a, gconstpointer b)
     return (e1->u == e2->u) && (e1->v == e2->v);
 }
 
+static int add_node_edges_to_set(graph *g, int node, GHashTable *edges)
+{
+    int new_edges = 0;
+    edge temp_edge;
+    int start = g->row_ptr[node];
+    int end = g->row_ptr[node + 1];
+
+    for (int j = start; j < end; ++j)
+    {
+        int neighbor = g->col_ind[j];
+
+        if (node < neighbor)
+        {
+            temp_edge.u = node;
+            temp_edge.v = neighbor;
+        }
+        else
+        {
+            temp_edge.u = neighbor;
+            temp_edge.v = node;
+        }
+
+        if (!g_hash_table_contains(edges, &temp_edge))
+        {
+            edge *new_e = g_new(edge, 1);
+            new_e->u = temp_edge.u;
+            new_e->v = temp_edge.v;
+            g_hash_table_add(edges, new_e);
+            new_edges++;
+        }
+    }
+    return new_edges;
+}
+
+static __thread GHashTable *g_edge_cache = NULL;
+
+/*
 int count_covered_edges(graph *g, int *coalition, size_t coalition_size)
 {
-    GHashTable *edges = g_hash_table_new_full(edge_hash, edge_equal, g_free, NULL);
-    if (edges == NULL)
-        return -1;
+    if (g_edge_cache == NULL)
+    {
+        g_edge_cache = g_hash_table_new_full(edge_hash, edge_equal, g_free, NULL);
+    }
+    else
+    {
+        g_hash_table_remove_all(g_edge_cache);
+    }
 
-    edge temp_edge;
+    if (g_edge_cache == NULL)
+        return -1;
 
     for (size_t i = 0; i < coalition_size; ++i)
     {
-        int curr = coalition[i];
-        int start = g->row_ptr[curr];
-        int end = g->row_ptr[curr + 1];
-
-        for (int j = start; j < end; ++j)
-        {
-            int neighbor = g->col_ind[j];
-
-            if (curr < neighbor)
-            {
-                temp_edge.u = curr;
-                temp_edge.v = neighbor;
-            }
-            else
-            {
-                temp_edge.u = neighbor;
-                temp_edge.v = curr;
-            }
-
-            if (!g_hash_table_contains(edges, &temp_edge))
-            {
-                edge *new_e = g_new(edge, 1);
-                new_e->u = temp_edge.u;
-                new_e->v = temp_edge.v;
-                g_hash_table_add(edges, new_e);
-            }
-        }
+        add_node_edges_to_set(g, coalition[i], g_edge_cache);
     }
 
-    int size = (int)g_hash_table_size(edges);
-    g_hash_table_destroy(edges);
+    int size = (int)g_hash_table_size(g_edge_cache);
     return size;
 }
+*/
 
 int is_coalition_valid_cover(graph *g, int *coalition, size_t coalition_size)
 {
@@ -170,139 +187,42 @@ int is_coalition_minimal(graph *g, int *coalition, size_t coalition_size)
     return minimal;
 }
 
-
-
-double characteristic_function_v1(graph *g, int *coalition, size_t coalition_size)
-{
-    if (coalition_size == 0)
-        return 0.0;
-
-    int covered = count_covered_edges(g, coalition, coalition_size);
-    if (covered < 0)
-        return 0.0;
-
-    double fraction = (double)covered / (double)g->num_edges;
-    double value = fraction * 100.0;
-
-    if (is_coalition_valid_cover(g, coalition, coalition_size))
-    {
-        if (!is_coalition_minimal(g, coalition, coalition_size))
-        {
-            value -= 10.0;
-        }
-    }
-
-    return value;
-}
-
-
-double characteristic_function_v2(graph *g, int *coalition, size_t coalition_size)
-{
-    if (coalition_size == 0)
-        return 0.0;
-
-    int covered = count_covered_edges(g, coalition, coalition_size);
-    if (covered < 0)
-        return 0.0;
-
-    double value = (double)covered;
-
-    if (is_coalition_valid_cover(g, coalition, coalition_size))
-    {
-        value += 100.0;
-
-        if (is_coalition_minimal(g, coalition, coalition_size))
-        {
-            value += 50.0;
-        }
-    }
-
-    return value;
-}
-
-
-double characteristic_function_v3(graph *g, int *coalition, size_t coalition_size)
-{
-    if (coalition_size == 0)
-        return 0.0;
-
-    int covered = count_covered_edges(g, coalition, coalition_size);
-    if (covered < 0)
-        return 0.0;
-
-    double value = (double)covered - (double)coalition_size * 0.5;
-
-    if (is_coalition_valid_cover(g, coalition, coalition_size))
-    {
-        value += 50.0;
-
-        if (is_coalition_minimal(g, coalition, coalition_size))
-        {
-            value += 30.0;
-        }
-    }
-
-    return value;
-}
-
-
 double *calculate_shapley_values(graph *g, int iterations, int version)
 {
+    // STA ZITTO GCC
+    (void)version;
+
     size_t n = g->num_nodes;
 
     double *shapley_values = calloc(n, sizeof(double));
 
     int *permutation = malloc(n * sizeof(int));
-
-    int *coalition = malloc(n * sizeof(int));
-
     for (size_t i = 0; i < n; i++)
     {
         permutation[i] = i;
     }
 
-    double (*char_func)(graph *, int *, size_t) = NULL;
-
-    if (version == 1)
-        char_func = characteristic_function_v1;
-    else if (version == 2)
-        char_func = characteristic_function_v2;
-    else if (version == 3)
-        char_func = characteristic_function_v3;
-    else
-    {
-        fprintf(stderr, "Error: invalid characteristic function version (%d)\n", version);
-        free(shapley_values);
-        free(permutation);
-        free(coalition);
-        return NULL;
-    }
     printf("[INFO] Starting optimized Shapley calculation (%d iterations)...\n", iterations);
+
+    GHashTable *edges = g_hash_table_new_full(edge_hash, edge_equal, g_free, NULL);
 
     for (int iter = 0; iter < iterations; ++iter)
     {
-
         shuffle_array(permutation, n);
+
+        g_hash_table_remove_all(edges);
+        int current_covered = 0;
 
         for (size_t i = 0; i < n; ++i)
         {
             int curr_node = permutation[i];
 
-            size_t coalition_size = 0;
-            for (size_t j = 0; j < i; ++j)
-            {
-                coalition[coalition_size++] = permutation[j];
-            }
+            double value_without = (double)current_covered;
 
-            double value_without = 0.0;
-            if (coalition_size > 0)
-            {
-                value_without = char_func(g, coalition, coalition_size);
-            }
+            int new_edges = add_node_edges_to_set(g, curr_node, edges);
+            current_covered += new_edges;
 
-            coalition[coalition_size] = curr_node;
-
-            double value_with = char_func(g, coalition, coalition_size + 1);
+            double value_with = (double)current_covered;
 
             double marginal_contribution = value_with - value_without;
 
@@ -313,13 +233,20 @@ double *calculate_shapley_values(graph *g, int iterations, int version)
             printf("[INFO] Iteration %d/%d completed\n", iter, iterations);
     }
 
+    g_hash_table_destroy(edges);
+
+    if (g_edge_cache != NULL)
+    {
+        g_hash_table_destroy(g_edge_cache);
+        g_edge_cache = NULL;
+    }
+
     for (size_t i = 0; i < n; i++)
     {
         shapley_values[i] /= iterations;
     }
 
     free(permutation);
-    free(coalition);
     printf("[OK] Shapley calculation completed\n");
     return shapley_values;
 }
