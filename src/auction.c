@@ -5,80 +5,12 @@
 #include <float.h>
 #include <math.h>
 #include "../include/auction.h"
+#include "../include/data_structures.h"
 #include "../include/logging.h"
 
 #define INF_DIST 1e14
 #define PENALTY_COST 200.0
 
-typedef struct {
-    int *nodes;
-    int length;
-    double cost;
-} path_t;
-
-typedef struct {
-    int id;
-    double dist;
-} pq_node;
-
-typedef struct {
-    pq_node *data;
-    int size;
-    int capacity;
-} min_heap;
-
-static min_heap* create_heap(int capacity) {
-    min_heap *h = malloc(sizeof(min_heap));
-    h->data = malloc(capacity * sizeof(pq_node));
-    h->size = 0;
-    h->capacity = capacity;
-    return h;
-}
-
-static void free_heap(min_heap *h) {
-    free(h->data);
-    free(h);
-}
-
-static void heap_push(min_heap *h, int id, double dist) {
-    if (h->size == h->capacity) {
-        fprintf(stderr, "Warning: Heap capacity reached, node %d not added\n", id);
-        return;
-    }
-    int i = h->size++;
-    while (i > 0) {
-        int p = (i - 1) / 2;
-        if (h->data[p].dist <= dist) break;
-        h->data[i] = h->data[p];
-        i = p;
-    }
-    h->data[i].id = id;
-    h->data[i].dist = dist;
-}
-
-static pq_node heap_pop(min_heap *h) {
-    if (h->size == 0) {
-        pq_node invalid = {-1, INF_DIST};
-        return invalid;
-    }
-    pq_node top = h->data[0];
-    pq_node last = h->data[--h->size];
-    if (h->size == 0) {
-        return top;
-    }
-    int i = 0;
-    while (i * 2 + 1 < h->size) {
-        int child = i * 2 + 1;
-        if (child + 1 < h->size && h->data[child + 1].dist < h->data[child].dist) {
-            child++;
-        }
-        if (last.dist <= h->data[child].dist) break;
-        h->data[i] = h->data[child];
-        i = child;
-    }
-    h->data[i] = last;
-    return top;
-}
 
 static double get_node_weight(int bid, unsigned char is_secure) {
     return (double)bid + (is_secure ? 0.0 : PENALTY_COST);

@@ -16,6 +16,32 @@ typedef struct
     int *col_ind;
 } graph;
 
+
+typedef struct {
+    int id;
+    double dist;
+} pq_node;
+
+typedef struct {
+    pq_node *data;
+    int size;
+    int capacity;
+} min_heap;
+
+
+typedef struct {
+    int *nodes;
+    int length;
+    double cost;
+} path_t;
+
+
+typedef struct {
+    int buyer_id;
+    int vendor_id;
+    double utility;
+} match_t;
+
 typedef struct
 {
     double *regrets;
@@ -57,5 +83,11 @@ graph* generate_barabasi_albert(int num_nodes, int m);
 
 void init_game(game_system *game, graph *g); 
 void free_game(game_system *game);
+
+
+min_heap* create_heap(int capacity);
+void free_heap(min_heap *h);
+void heap_push(min_heap *h, int id, double dist);
+pq_node heap_pop(min_heap *h);
 
 #endif

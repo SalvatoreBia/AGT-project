@@ -411,3 +411,59 @@ void free_game(game_system *game)
     if (game->strategies)
         free(game->strategies);
 }
+
+
+#define INF_DIST_HEAP 1e14
+
+min_heap* create_heap(int capacity) {
+    min_heap *h = malloc(sizeof(min_heap));
+    h->data = malloc(capacity * sizeof(pq_node));
+    h->size = 0;
+    h->capacity = capacity;
+    return h;
+}
+
+void free_heap(min_heap *h) {
+    free(h->data);
+    free(h);
+}
+
+void heap_push(min_heap *h, int id, double dist) {
+    if (h->size == h->capacity) {
+        fprintf(stderr, "Warning: Heap capacity reached, node %d not added\n", id);
+        return;
+    }
+    int i = h->size++;
+    while (i > 0) {
+        int p = (i - 1) / 2;
+        if (h->data[p].dist <= dist) break;
+        h->data[i] = h->data[p];
+        i = p;
+    }
+    h->data[i].id = id;
+    h->data[i].dist = dist;
+}
+
+pq_node heap_pop(min_heap *h) {
+    if (h->size == 0) {
+        pq_node invalid = {-1, INF_DIST_HEAP};
+        return invalid;
+    }
+    pq_node top = h->data[0];
+    pq_node last = h->data[--h->size];
+    if (h->size == 0) {
+        return top;
+    }
+    int i = 0;
+    while (i * 2 + 1 < h->size) {
+        int child = i * 2 + 1;
+        if (child + 1 < h->size && h->data[child + 1].dist < h->data[child].dist) {
+            child++;
+        }
+        if (last.dist <= h->data[child].dist) break;
+        h->data[i] = h->data[child];
+        i = child;
+    }
+    h->data[i] = last;
+    return top;
+}
