@@ -30,7 +30,7 @@ OBJ_DIR := build
 OBJ := $(patsubst %.c,$(OBJ_DIR)/%.o,$(SRC))
 TARGET := $(OBJ_DIR)/main
 
-.PHONY: all run run-shapley run-fp run-brd run-rm clean dirs benchmark
+.PHONY: all run run-shapley run-fp run-brd run-rm clean dirs
 
 all: dirs $(TARGET)
 
@@ -68,14 +68,5 @@ run-rm: all
 test_1000: $(OBJ_DIR)/test_convergence_1000.o $(OBJ_DIR)/src/algorithm.o $(OBJ_DIR)/src/data_structures.o
 	$(CC) $(CFLAGS) -o $(OBJ_DIR)/test_convergence_1000 $^ $(LDFLAGS)
 
-# Benchmark all strategic game algorithms
-BENCH_DEPS := $(OBJ_DIR)/benchmark.o $(OBJ_DIR)/src/data_structures.o $(OBJ_DIR)/src/strategic_game.o
-benchmark: dirs $(BENCH_DEPS)
-	$(CC) $(CFLAGS) -o $(OBJ_DIR)/benchmark $(BENCH_DEPS) $(LDFLAGS)
-
-run-benchmark: benchmark
-	./$(OBJ_DIR)/benchmark
-
 clean:
 	rm -rf $(OBJ_DIR)
-
